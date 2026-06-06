@@ -116,12 +116,44 @@ LLM filtering should be a later adapter behind `InboundMessageClassifier`.
 Do not put LLM runtime calls directly in `ReceiveSmsWorker` or
 `ReceiveMmsWorker`.
 
+The domain adapter seam lives under:
+
+- `domain/src/main/java/com/moez/QKSMS/textblock/llm/LlmClassificationRequest.kt`
+- `domain/src/main/java/com/moez/QKSMS/textblock/llm/OnDeviceLlmRuntime.kt`
+- `domain/src/main/java/com/moez/QKSMS/textblock/llm/OnDeviceLlmInboundMessageClassifier.kt`
+- `domain/src/main/java/com/moez/QKSMS/textblock/llm/NoModelOnDeviceLlmRuntime.kt`
+- `domain/src/main/java/com/moez/QKSMS/textblock/llm/NoModelFallbackClassifier.kt`
+
+`OnDeviceLlmInboundMessageClassifier` still implements
+`InboundMessageClassifier`, so receive workers keep depending on only that
+domain interface. A future Android runtime should implement `OnDeviceLlmRuntime`
+and be injected into the adapter from composition code.
+
+The runtime contract is intentionally small and synchronous for now:
+
+```kotlin
+interface OnDeviceLlmRuntime {
+    fun classify(request: LlmClassificationRequest): OnDeviceLlmRuntimeResult
+}
+```
+
+Runtime results are explicit:
+
+- `Classified` returns a completed `ClassificationResult`.
+- `ModelUnavailable` means no model/runtime is configured or loaded.
+- `Deferred` means classification should not happen synchronously.
+
+`ModelUnavailable` and `Deferred` map to `NoModelFallbackClassifier`, which
+returns `ALLOW`, `UNKNOWN`, zero confidence, and an explanatory reason. This
+keeps phones without a model from blocking or quarantining messages by surprise.
+
 Expected adapter flow:
 
 1. Fast rules run first.
 2. Obvious allow/block decisions return immediately.
-3. Ambiguous messages are queued for LLM classification.
-4. LLM results update the message state and optionally suppress future
+3. Ambiguous messages call the optional LLM adapter.
+4. Missing, unloaded, or deferred model runtime returns the no-model fallback.
+5. Future async LLM results update the message state and optionally suppress future
    notifications for similar senders/content.
 
 This prevents slow model startup from blocking SMS receive handling.
@@ -131,6 +163,12 @@ Potential Android runtime targets:
 - Google AI Edge / LiteRT-LM for Gemma-family local inference.
 - MediaPipe LLM Inference API if it remains the simpler supported entry point.
 - A no-LLM fallback for lower-end phones.
+
+Future Gemma/LiteRT/MediaPipe integration should stay in an Android/runtime
+module and plug in by implementing `OnDeviceLlmRuntime`. If model loading is
+asynchronous, return `ModelUnavailable` until the runtime is ready. If inference
+needs a later worker, return `Deferred` and add persistence in a separate slice.
+Do not store raw message samples for runtime debugging, retries, or tests.
 
 ## Privacy Constraints
 
