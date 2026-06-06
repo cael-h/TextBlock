@@ -34,6 +34,7 @@ import dev.octoshrimpy.quik.repository.MessageContentFilterRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.repository.ScheduledMessageRepository
 import dev.octoshrimpy.quik.repository.SyncRepository
+import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.util.Preferences
 import javax.inject.Inject
 
@@ -50,6 +51,7 @@ class InjectionWorkerFactory @Inject constructor(
     private val syncRepo: SyncRepository,
     private val filterRepo: MessageContentFilterRepository,
     private val contactRepo: ContactRepository,
+    private val inboundMessageClassifier: InboundMessageClassifier,
 
 ) : WorkerFactory() {
     override fun createWorker(
@@ -76,6 +78,7 @@ class InjectionWorkerFactory @Inject constructor(
                 instance.updateBadge =  updateBadge
                 instance.filterRepo = filterRepo
                 instance.contactsRepo = contactRepo
+                instance.inboundMessageClassifier = inboundMessageClassifier
             }
             is ReceiveMmsWorker -> {
                 instance.syncRepo = syncRepo
@@ -89,6 +92,7 @@ class InjectionWorkerFactory @Inject constructor(
                 instance.updateBadge = updateBadge
                 instance.filterRepo = filterRepo
                 instance.contactsRepo = contactRepo
+                instance.inboundMessageClassifier = inboundMessageClassifier
             }
         }
 
