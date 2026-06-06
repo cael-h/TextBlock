@@ -139,6 +139,35 @@ The current classifier is not wired into live SMS/MMS receive handling yet. It i
 the stable boundary for rule-based filtering now and on-device LLM filtering
 later.
 
+## Build Environment Status
+
+The Termux/aarch64 checkout can run Java 17 and `./gradlew --version`. A
+manager-provisioned SDK shim now exists at
+`/data/data/com.termux/files/home/android-sdk-termux` with Android platforms 33
+and 34, accepted licenses, platform-tools, and build-tools backed by Termux
+Android tool packages.
+
+Use `scripts/check-android-build-env.sh` for non-mutating local checks. With the
+Termux shim, Gradle task discovery and focused domain unit tests can be verified
+locally:
+
+```sh
+export ANDROID_HOME=/data/data/com.termux/files/home/android-sdk-termux
+./scripts/check-android-build-env.sh
+./gradlew tasks --all -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+```
+
+Full APK assembly and lint still need verification in Termux or desktop/CI:
+
+```sh
+./gradlew --no-daemon :presentation:assembleDebug
+./gradlew --no-daemon test
+./gradlew --no-daemon lint
+```
+
+See `docs/slices/android-build-env-plan.md` for Termux package notes, fallback
+SDK setup commands, and current blockers.
+
 ## Sample-Derived Rules
 
 The first rule set came from user-provided Google Drive text exports. The raw
