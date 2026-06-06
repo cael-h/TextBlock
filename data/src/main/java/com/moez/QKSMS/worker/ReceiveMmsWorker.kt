@@ -48,12 +48,17 @@ import dev.octoshrimpy.quik.interactor.UpdateBadge
 import dev.octoshrimpy.quik.manager.ActiveConversationManager
 import dev.octoshrimpy.quik.manager.NotificationManager
 import dev.octoshrimpy.quik.manager.ShortcutManager
+import dev.octoshrimpy.quik.model.Message
 import dev.octoshrimpy.quik.receiver.MessageSentReceiver
 import dev.octoshrimpy.quik.repository.ContactRepository
 import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageContentFilterRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.repository.SyncRepository
+import dev.octoshrimpy.quik.textblock.ClassificationResult
+import dev.octoshrimpy.quik.textblock.FilterAction
+import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
+import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import java.io.File
@@ -88,6 +93,7 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
     @Inject lateinit var shortcutManager: ShortcutManager
     @Inject lateinit var filterRepo: MessageContentFilterRepository
     @Inject lateinit var contactsRepo: ContactRepository
+    @Inject lateinit var inboundMessageClassifier: InboundMessageClassifier
 
     override fun doWork(): Result {
         Timber.v("started")
@@ -196,38 +202,51 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
 
                         // update the conversation
                         conversationRepo.updateConversations(listOf(message.threadId))
-                        val conversation =
-                            conversationRepo.getOrCreateConversation(message.threadId)
-                                ?: return Result.failure(inputData)
 
-                        // don't notify (continue) for blocked conversations
-                        if (conversation.blocked) {
-                            Timber.v("no notifications for blocked")
-                            return Result.success(inputData)
+                        val textBlockResult = classifyTextBlock(message)
+                        val textBlockSuppressesNotification = textBlockResult.shouldSuppressNotification()
+                        if (textBlockSuppressesNotification) {
+                            Timber.v("TextBlock classified MMS as ${textBlockResult.action}")
+                            messageRepo.markRead(listOf(message.threadId))
+                            conversationRepo.markBlocked(
+                                listOf(message.threadId),
+                                prefs.blockingManager.get(),
+                                textBlockResult.toBlockReason()
+                            )
+                        } else {
+                            val conversation =
+                                conversationRepo.getOrCreateConversation(message.threadId)
+                                    ?: return Result.failure(inputData)
+
+                            // don't notify (continue) for blocked conversations
+                            if (conversation.blocked) {
+                                Timber.v("no notifications for blocked")
+                                return Result.success(inputData)
+                            }
+
+                            // unarchive conversation if necessary
+                            if (conversation.archived)
+                                conversationRepo.markUnarchived(listOf(conversation.id))
+
+                            // unarchive conversation if necessary
+                            if (conversation.archived) {
+                                Timber.v("conversation unarchived")
+                                conversationRepo.markUnarchived(listOf(conversation.id))
+                            }
+
+                            // update/create notification
+                            Timber.v("update/create notification")
+                            notificationManager.update(conversation.id)
+
+                            // update shortcuts
+                            Timber.v("update shortcuts")
+                            shortcutManager.updateShortcuts()
+                            shortcutManager.getOrCreateShortcut(conversation.id)
+
+                            // update the badge and widget
+                            Timber.v("update badge and widget")
+                            updateBadge.execute(Unit)
                         }
-
-                        // unarchive conversation if necessary
-                        if (conversation.archived)
-                            conversationRepo.markUnarchived(listOf(conversation.id))
-
-                        // unarchive conversation if necessary
-                        if (conversation.archived) {
-                            Timber.v("conversation unarchived")
-                            conversationRepo.markUnarchived(listOf(conversation.id))
-                        }
-
-                        // update/create notification
-                        Timber.v("update/create notification")
-                        notificationManager.update(conversation.id)
-
-                        // update shortcuts
-                        Timber.v("update shortcuts")
-                        shortcutManager.updateShortcuts()
-                        shortcutManager.getOrCreateShortcut(conversation.id)
-
-                        // update the badge and widget
-                        Timber.v("update badge and widget")
-                        updateBadge.execute(Unit)
                     }
 
                     // send ack to mmsc
@@ -251,6 +270,38 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
         Timber.v("finished")
 
         return Result.success()
+    }
+
+    private fun classifyTextBlock(message: Message): ClassificationResult {
+        return inboundMessageClassifier.classify(
+            InboundMessageForClassification(
+                address = message.address,
+                body = message.getText(),
+                timestampMillis = message.date,
+                isMms = message.isMms(),
+                isFromContact = contactsRepo.isContact(message.address),
+                subscriptionId = message.subId
+            )
+        )
+    }
+
+    private fun ClassificationResult.shouldSuppressNotification(): Boolean {
+        return when (action) {
+            FilterAction.ALLOW -> false
+            FilterAction.QUARANTINE,
+            FilterAction.BLOCK_CONVERSATION,
+            FilterAction.DROP -> true
+        }
+    }
+
+    private fun ClassificationResult.toBlockReason(): String {
+        return buildString {
+            append("TextBlock ")
+            append(category.name)
+            append(" confidence=")
+            append(confidence)
+            reason?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+        }
     }
 
     private fun handleHttpError(context: Context, mmsHttpStatus: Int, locationUrl: String) {

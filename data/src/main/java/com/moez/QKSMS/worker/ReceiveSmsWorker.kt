@@ -26,10 +26,15 @@ import dev.octoshrimpy.quik.blocking.BlockingClient
 import dev.octoshrimpy.quik.interactor.UpdateBadge
 import dev.octoshrimpy.quik.manager.NotificationManager
 import dev.octoshrimpy.quik.manager.ShortcutManager
+import dev.octoshrimpy.quik.model.Message
 import dev.octoshrimpy.quik.repository.ContactRepository
 import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageContentFilterRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
+import dev.octoshrimpy.quik.textblock.ClassificationResult
+import dev.octoshrimpy.quik.textblock.FilterAction
+import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
+import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import javax.inject.Inject
@@ -49,6 +54,7 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
     @Inject lateinit var shortcutManager: ShortcutManager
     @Inject lateinit var filterRepo: MessageContentFilterRepository
     @Inject lateinit var contactsRepo: ContactRepository
+    @Inject lateinit var inboundMessageClassifier: InboundMessageClassifier
 
     override fun doWork(): Result {
         Timber.v("started")
@@ -98,6 +104,19 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
 
         // update and fetch conversation
         conversationRepo.updateConversations(listOf(message.threadId))
+
+        val textBlockResult = classifyTextBlock(message)
+        if (textBlockResult.shouldSuppressNotification()) {
+            Timber.v("TextBlock classified SMS as ${textBlockResult.action}")
+            messageRepo.markRead(listOf(message.threadId))
+            conversationRepo.markBlocked(
+                listOf(message.threadId),
+                prefs.blockingManager.get(),
+                textBlockResult.toBlockReason()
+            )
+            return Result.failure(inputData)
+        }
+
         val conversation = conversationRepo.getOrCreateConversation(message.threadId)
             ?: return Result.failure(inputData)
 
@@ -129,6 +148,38 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
         Timber.v("finished")
 
         return Result.success()
+    }
+
+    private fun classifyTextBlock(message: Message): ClassificationResult {
+        return inboundMessageClassifier.classify(
+            InboundMessageForClassification(
+                address = message.address,
+                body = message.getText(),
+                timestampMillis = message.date,
+                isMms = message.isMms(),
+                isFromContact = contactsRepo.isContact(message.address),
+                subscriptionId = message.subId
+            )
+        )
+    }
+
+    private fun ClassificationResult.shouldSuppressNotification(): Boolean {
+        return when (action) {
+            FilterAction.ALLOW -> false
+            FilterAction.QUARANTINE,
+            FilterAction.BLOCK_CONVERSATION,
+            FilterAction.DROP -> true
+        }
+    }
+
+    private fun ClassificationResult.toBlockReason(): String {
+        return buildString {
+            append("TextBlock ")
+            append(category.name)
+            append(" confidence=")
+            append(confidence)
+            reason?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+        }
     }
 
     override fun getForegroundInfo() = ForegroundInfo(
