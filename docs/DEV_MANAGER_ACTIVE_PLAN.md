@@ -27,10 +27,11 @@ The current foundation is complete:
 ## Current Status
 
 - Branch: `textblock-filter-foundation`
-- Latest pushed commit: `c67a3ba5 Document TextBlock development plan`
+- Local integration head: `92ad5f61 Merge TextBlock inbound filter slice`
+- Latest pushed commit before this integration batch: `fa5ac347 Add active dev manager plan`
 - Worktree support: available
-- Java status: `java` not found
-- Android SDK env vars: `ANDROID_HOME`, `ANDROID_SDK_ROOT`, and `JAVA_HOME` are unset
+- Java status: OpenJDK 17.0.19 installed and `./gradlew --version` works.
+- Android SDK status: not configured. Gradle Android tasks fail before compile/test because `ANDROID_HOME` is unset and `local.properties` has no `sdk.dir`.
 - Automation status: no scheduler/automation tool is available in this session, so 20-minute checks will be manual.
 - Multi-agent status: subagent tools are available.
 
@@ -39,6 +40,8 @@ The current foundation is complete:
 ### Slice A: Build Readiness
 
 Owner: manager/local critical path
+
+Status: completed with Android SDK blocker documented
 
 Goal:
 
@@ -59,9 +62,17 @@ Risk:
 
 - Android Gradle builds may require SDK packages that are not installed.
 
+Result:
+
+- Installed Java 17 and confirmed Gradle wrapper startup.
+- `./gradlew tasks --all` failed before task execution because the Android SDK location is not configured.
+- Full compile/test verification remains blocked until `ANDROID_HOME` or `local.properties` `sdk.dir` points at a valid Android SDK.
+
 ### Slice B: App Identity Separation
 
 Owner: worker
+
+Status: merged
 
 Goal:
 
@@ -81,9 +92,18 @@ Non-goals:
 - Large UI redesign.
 - Receive-path filtering.
 
+Result:
+
+- Merged `textblock-app-identity` into `textblock-filter-foundation`.
+- Release application id is now `com.caelh.textblock`; debug and F-Droid variants use `.debug` and `.fdroid`.
+- App label and focused default English identity copy now use TextBlock.
+- Reviewer finding on localized French `app_name` was implemented by removing the stale localized override so locales inherit the non-translatable default label.
+
 ### Slice C: Inbound Filter Integration
 
 Owner: worker
+
+Status: merged
 
 Goal:
 
@@ -103,9 +123,19 @@ Non-goals:
 - Dedicated quarantine UI.
 - Settings UI.
 
+Result:
+
+- Merged `textblock-inbound-filter` into `textblock-filter-foundation`.
+- `InboundMessageClassifier` is provided through Dagger and assigned by `InjectionWorkerFactory` to SMS/MMS receive workers.
+- SMS and MMS receive paths classify after existing blocked-sender and user content-filter checks, and before normal notification work.
+- TextBlock `QUARANTINE`, `BLOCK_CONVERSATION`, and `DROP` actions suppress notification by marking the thread read and marking the conversation blocked; no TextBlock path deletes messages by default.
+- Reviewer finding on MMS acknowledgement was implemented: classified MMS no longer returns before `sendAcknowledgeInd(...)` / `sendNotifyRespInd(...)`.
+
 ### Slice D: Classifier Tests And Synthetic Samples
 
 Owner: worker
+
+Status: merged
 
 Goal:
 
@@ -124,15 +154,30 @@ Non-goals:
 - Raw user messages.
 - SMS/MMS receive integration.
 
+Result:
+
+- Merged `textblock-classifier-tests` into `textblock-filter-foundation`.
+- Added synthetic JUnit 4 coverage for political donation spam, petition spam, Unicode normalization, MMS export noise, `/l/` link behavior, and benign allow cases.
+- Reviewer found no implementation issues.
+
 ### Slice E: Review
 
 Owner: reviewer after workers finish
+
+Status: completed
 
 Goal:
 
 - Review each completed slice.
 - Write findings to `docs/reviews/<slice>-review.md`.
 - Original worker closes or disputes findings.
+
+Result:
+
+- Review docs were created under `docs/reviews/`.
+- App identity review produced one medium finding; implemented by the identity worker.
+- Inbound filter review produced one high finding; implemented by the inbound worker.
+- Classifier tests review produced no implementation findings.
 
 ## Worker Assignments
 
@@ -168,6 +213,12 @@ No automation tool is available in this session, so no scheduled check was set.
 - Push each completed milestone to `origin`.
 - Do not push to `upstream`.
 
+Merge result:
+
+- `textblock-app-identity` merged via `405b79ee`.
+- `textblock-classifier-tests` merged via `8c7249eb`.
+- `textblock-inbound-filter` merged via `92ad5f61`.
+
 ## Risk Register
 
 - Build tooling may be incomplete in Termux.
@@ -178,9 +229,9 @@ No automation tool is available in this session, so no scheduled check was set.
 
 ## Completion Criteria For This Milestone
 
-- Build readiness documented and improved where possible.
-- App identity plan or implementation completed.
-- Inbound filter integration plan or implementation completed.
-- Classifier tests added or test blocker documented.
-- Review docs produced for completed implementation slices.
-- Branch pushed to `origin`.
+- [x] Build readiness documented and improved where possible.
+- [x] App identity implementation completed.
+- [x] Inbound filter integration implementation completed.
+- [x] Classifier tests added with Android SDK test blocker documented.
+- [x] Review docs produced for completed implementation slices.
+- [ ] Branch pushed to `origin`.
