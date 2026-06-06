@@ -84,6 +84,9 @@ class Preferences @Inject constructor(
         const val MESSAGE_LINK_HANDLING_BLOCK = 0
         const val MESSAGE_LINK_HANDLING_ALLOW = 1
         const val MESSAGE_LINK_HANDLING_ASK = 2
+
+        const val TEXTBLOCK_FILTER_MODE_QUARANTINE = 0
+        const val TEXTBLOCK_FILTER_MODE_DROP = 1
     }
 
     // Internal
@@ -137,6 +140,10 @@ class Preferences @Inject constructor(
     val unreadAtTop = rxPrefs.getBoolean("unreadAtTop", false)
 
     val autoDeduplicate = rxPrefs.getBoolean("autoDeduplicateMessages", false)
+
+    val textBlockFiltering = rxPrefs.getBoolean("textBlockFiltering", true)
+    val textBlockFilterMode = rxPrefs.getInteger("textBlockFilterMode", TEXTBLOCK_FILTER_MODE_QUARANTINE)
+    val textBlockAllowContacts = rxPrefs.getBoolean("textBlockAllowContacts", true)
 
     init {
         // Migrate from old night mode preference to new one, now that we support android Q night mode

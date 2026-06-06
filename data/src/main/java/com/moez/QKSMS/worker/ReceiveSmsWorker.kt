@@ -32,9 +32,10 @@ import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageContentFilterRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.textblock.ClassificationResult
-import dev.octoshrimpy.quik.textblock.FilterAction
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
+import dev.octoshrimpy.quik.textblock.TextBlockFilterDecision
+import dev.octoshrimpy.quik.textblock.TextBlockFilterPolicy
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import javax.inject.Inject
@@ -105,16 +106,40 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
         // update and fetch conversation
         conversationRepo.updateConversations(listOf(message.threadId))
 
-        val textBlockResult = classifyTextBlock(message)
-        if (textBlockResult.shouldSuppressNotification()) {
-            Timber.v("TextBlock classified SMS as ${textBlockResult.action}")
-            messageRepo.markRead(listOf(message.threadId))
-            conversationRepo.markBlocked(
-                listOf(message.threadId),
-                prefs.blockingManager.get(),
-                textBlockResult.toBlockReason()
+        val senderIsContact = contactsRepo.isContact(message.address)
+        if (TextBlockFilterPolicy.shouldClassify(
+                filteringEnabled = prefs.textBlockFiltering.get(),
+                allowContacts = prefs.textBlockAllowContacts.get(),
+                isFromContact = senderIsContact
             )
-            return Result.failure(inputData)
+        ) {
+            val textBlockResult = classifyTextBlock(
+                message,
+                TextBlockFilterPolicy.isFromContactForClassifier(
+                    allowContacts = prefs.textBlockAllowContacts.get(),
+                    isFromContact = senderIsContact
+                )
+            )
+            when (TextBlockFilterPolicy.actionFor(textBlockResult, isTextBlockDropMode())) {
+                TextBlockFilterDecision.ALLOW -> Unit
+
+                TextBlockFilterDecision.QUARANTINE -> {
+                    Timber.v("TextBlock quarantined SMS as ${textBlockResult.action}")
+                    messageRepo.markRead(listOf(message.threadId))
+                    conversationRepo.markBlocked(
+                        listOf(message.threadId),
+                        prefs.blockingManager.get(),
+                        textBlockResult.toBlockReason()
+                    )
+                    return Result.failure(inputData)
+                }
+
+                TextBlockFilterDecision.DROP -> {
+                    Timber.v("TextBlock dropped SMS as ${textBlockResult.action}")
+                    messageRepo.deleteMessages(listOf(message.id))
+                    return Result.failure(inputData)
+                }
+            }
         }
 
         val conversation = conversationRepo.getOrCreateConversation(message.threadId)
@@ -150,26 +175,21 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
         return Result.success()
     }
 
-    private fun classifyTextBlock(message: Message): ClassificationResult {
+    private fun classifyTextBlock(message: Message, isFromContact: Boolean): ClassificationResult {
         return inboundMessageClassifier.classify(
             InboundMessageForClassification(
                 address = message.address,
                 body = message.getText(),
                 timestampMillis = message.date,
                 isMms = message.isMms(),
-                isFromContact = contactsRepo.isContact(message.address),
+                isFromContact = isFromContact,
                 subscriptionId = message.subId
             )
         )
     }
 
-    private fun ClassificationResult.shouldSuppressNotification(): Boolean {
-        return when (action) {
-            FilterAction.ALLOW -> false
-            FilterAction.QUARANTINE,
-            FilterAction.BLOCK_CONVERSATION,
-            FilterAction.DROP -> true
-        }
+    private fun isTextBlockDropMode(): Boolean {
+        return prefs.textBlockFilterMode.get() == Preferences.TEXTBLOCK_FILTER_MODE_DROP
     }
 
     private fun ClassificationResult.toBlockReason(): String {

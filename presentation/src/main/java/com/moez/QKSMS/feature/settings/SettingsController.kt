@@ -69,6 +69,7 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
     @Inject lateinit var sendDelayDialog: QkDialog
     @Inject lateinit var mmsSizeDialog: QkDialog
     @Inject lateinit var messageLinkHandlingDialog: QkDialog
+    @Inject lateinit var textBlockFilterModeDialog: QkDialog
 
     @Inject override lateinit var presenter: SettingsPresenter
 
@@ -105,6 +106,7 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
         sendDelayDialog.adapter.setData(R.array.delayed_sending_labels)
         mmsSizeDialog.adapter.setData(R.array.mms_sizes, R.array.mms_sizes_ids)
         messageLinkHandlingDialog.adapter.setData(R.array.messageLinkHandlings, R.array.messageLinkHandling_ids)
+        textBlockFilterModeDialog.adapter.setData(R.array.textblock_filter_modes, R.array.textblock_filter_mode_ids)
 
         binding.about.summary = context.getString(R.string.settings_version, BuildConfig.VERSION_NAME)
     }
@@ -141,6 +143,8 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
     override fun mmsSizeSelected(): Observable<Int> = mmsSizeDialog.adapter.menuItemClicks
 
     override fun messageLinkHandlingSelected(): Observable<Int> = messageLinkHandlingDialog.adapter.menuItemClicks
+
+    override fun textBlockFilterModeSelected(): Observable<Int> = textBlockFilterModeDialog.adapter.menuItemClicks
 
     override fun render(state: SettingsState) {
         binding.theme.findViewById<View>(R.id.themePreview)?.setBackgroundTint(state.theme)
@@ -187,6 +191,11 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
         messageLinkHandlingDialog.adapter.selectedItem = state.messageLinkHandlingId
 
         binding.disableScreenshots.checkbox?.isChecked = state.disableScreenshotsEnabled
+
+        binding.textBlockFiltering.checkbox?.isChecked = state.textBlockFilteringEnabled
+        binding.textBlockFilterMode.summary = state.textBlockFilterModeSummary
+        textBlockFilterModeDialog.adapter.selectedItem = state.textBlockFilterModeId
+        binding.textBlockAllowContacts.checkbox?.isChecked = state.textBlockAllowContactsEnabled
 
         when (state.syncProgress) {
             is SyncRepository.SyncProgress.Idle -> binding.syncingProgress.isVisible = false
@@ -241,6 +250,8 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
     override fun showMmsSizePicker() = mmsSizeDialog.show(activity!!)
 
     override fun showMessageLinkHandlingDialogPicker() = messageLinkHandlingDialog.show(activity!!)
+
+    override fun showTextBlockFilterModeDialog() = textBlockFilterModeDialog.show(activity!!)
 
     override fun showSwipeActions() {
         router.pushController(RouterTransaction.with(SwipeActionsController())

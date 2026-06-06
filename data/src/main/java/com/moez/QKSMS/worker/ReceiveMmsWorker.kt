@@ -56,9 +56,10 @@ import dev.octoshrimpy.quik.repository.MessageContentFilterRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.repository.SyncRepository
 import dev.octoshrimpy.quik.textblock.ClassificationResult
-import dev.octoshrimpy.quik.textblock.FilterAction
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
+import dev.octoshrimpy.quik.textblock.TextBlockFilterDecision
+import dev.octoshrimpy.quik.textblock.TextBlockFilterPolicy
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import java.io.File
@@ -158,94 +159,121 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                 if (messageUri != null) {
                     // Sync the message
                     val message = syncRepo.syncMessage(messageUri)
-                        ?: return Result.failure(inputData)
-
-                    // TODO: Ideally this is done when we're saving the MMS to ContentResolver
-                    // This change can be made once we move the MMS storing code to the Data module
-                    if (activeConversationManager.getActiveConversation() == message.threadId) {
-                        messageRepo.markRead(listOf(message.threadId))
-                    }
-
-                    // Because we use the smsmms library for receiving and storing MMS, we'll need
-                    // to check if it should be blocked after we've pulled it into realm. If it
-                    // turns out that it should be dropped, then delete it
-                    // TODO Don't store blocked messages in the first place
-                    val action = blockingClient.shouldBlock(message.address).blockingGet()
-                    val shouldDrop = prefs.drop.get()
-                    Timber.v("block=$action, drop=$shouldDrop")
-
-                    if (action is BlockingClient.Action.Block && shouldDrop) {
-                        messageRepo.deleteMessages(listOf(message.id))
+                    if (message == null) {
+                        Timber.e("failed to sync persisted MMS")
                     } else {
-                        when (action) {
-                            is BlockingClient.Action.Block -> {
-                                messageRepo.markRead(listOf(message.threadId))
-                                conversationRepo.markBlocked(
-                                    listOf(message.threadId),
-                                    prefs.blockingManager.get(),
-                                    action.reason
-                                )
-                            }
+                        var shouldNotify = true
 
-                            is BlockingClient.Action.Unblock ->
-                                conversationRepo.markUnblocked(message.threadId)
-
-                            else -> Unit
-                        }
-
-                        val messageFilterAction = filterRepo.isBlocked(message.getText(), message.address, contactsRepo)
-                        if (messageFilterAction) {
-                            Timber.v("message dropped based on content filters")
-                            messageRepo.deleteMessages(listOf(message.id))
-                            return Result.failure(inputData)
-                        }
-
-                        // update the conversation
-                        conversationRepo.updateConversations(listOf(message.threadId))
-
-                        val textBlockResult = classifyTextBlock(message)
-                        val textBlockSuppressesNotification = textBlockResult.shouldSuppressNotification()
-                        if (textBlockSuppressesNotification) {
-                            Timber.v("TextBlock classified MMS as ${textBlockResult.action}")
+                        // TODO: Ideally this is done when we're saving the MMS to ContentResolver
+                        // This change can be made once we move the MMS storing code to the Data module
+                        if (activeConversationManager.getActiveConversation() == message.threadId) {
                             messageRepo.markRead(listOf(message.threadId))
-                            conversationRepo.markBlocked(
-                                listOf(message.threadId),
-                                prefs.blockingManager.get(),
-                                textBlockResult.toBlockReason()
-                            )
+                        }
+
+                        // Because we use the smsmms library for receiving and storing MMS, we'll need
+                        // to check if it should be blocked after we've pulled it into realm. If it
+                        // turns out that it should be dropped, then delete it
+                        // TODO Don't store blocked messages in the first place
+                        val action = blockingClient.shouldBlock(message.address).blockingGet()
+                        val shouldDrop = prefs.drop.get()
+                        Timber.v("block=$action, drop=$shouldDrop")
+
+                        if (action is BlockingClient.Action.Block && shouldDrop) {
+                            messageRepo.deleteMessages(listOf(message.id))
+                            shouldNotify = false
                         } else {
-                            val conversation =
-                                conversationRepo.getOrCreateConversation(message.threadId)
-                                    ?: return Result.failure(inputData)
+                            when (action) {
+                                is BlockingClient.Action.Block -> {
+                                    messageRepo.markRead(listOf(message.threadId))
+                                    conversationRepo.markBlocked(
+                                        listOf(message.threadId),
+                                        prefs.blockingManager.get(),
+                                        action.reason
+                                    )
+                                }
 
-                            // don't notify (continue) for blocked conversations
-                            if (conversation.blocked) {
-                                Timber.v("no notifications for blocked")
-                                return Result.success(inputData)
+                                is BlockingClient.Action.Unblock ->
+                                    conversationRepo.markUnblocked(message.threadId)
+
+                                else -> Unit
                             }
 
-                            // unarchive conversation if necessary
-                            if (conversation.archived)
-                                conversationRepo.markUnarchived(listOf(conversation.id))
-
-                            // unarchive conversation if necessary
-                            if (conversation.archived) {
-                                Timber.v("conversation unarchived")
-                                conversationRepo.markUnarchived(listOf(conversation.id))
+                            val messageFilterAction = filterRepo.isBlocked(message.getText(), message.address, contactsRepo)
+                            if (messageFilterAction) {
+                                Timber.v("message dropped based on content filters")
+                                messageRepo.deleteMessages(listOf(message.id))
+                                shouldNotify = false
                             }
 
-                            // update/create notification
-                            Timber.v("update/create notification")
-                            notificationManager.update(conversation.id)
+                            if (shouldNotify) {
+                                // update the conversation
+                                conversationRepo.updateConversations(listOf(message.threadId))
 
-                            // update shortcuts
-                            Timber.v("update shortcuts")
-                            shortcutManager.updateShortcuts()
-                            shortcutManager.getOrCreateShortcut(conversation.id)
+                                val senderIsContact = contactsRepo.isContact(message.address)
+                                if (TextBlockFilterPolicy.shouldClassify(
+                                        filteringEnabled = prefs.textBlockFiltering.get(),
+                                        allowContacts = prefs.textBlockAllowContacts.get(),
+                                        isFromContact = senderIsContact
+                                    )
+                                ) {
+                                    val textBlockResult = classifyTextBlock(
+                                        message,
+                                        TextBlockFilterPolicy.isFromContactForClassifier(
+                                            allowContacts = prefs.textBlockAllowContacts.get(),
+                                            isFromContact = senderIsContact
+                                        )
+                                    )
+                                    when (TextBlockFilterPolicy.actionFor(textBlockResult, isTextBlockDropMode())) {
+                                        TextBlockFilterDecision.ALLOW -> Unit
 
-                            // update the badge and widget
-                            Timber.v("update badge and widget")
-                            updateBadge.execute(Unit)
+                                        TextBlockFilterDecision.QUARANTINE -> {
+                                            Timber.v("TextBlock quarantined MMS as ${textBlockResult.action}")
+                                            messageRepo.markRead(listOf(message.threadId))
+                                            conversationRepo.markBlocked(
+                                                listOf(message.threadId),
+                                                prefs.blockingManager.get(),
+                                                textBlockResult.toBlockReason()
+                                            )
+                                            shouldNotify = false
+                                        }
+
+                                        TextBlockFilterDecision.DROP -> {
+                                            Timber.v("TextBlock dropped MMS as ${textBlockResult.action}")
+                                            messageRepo.deleteMessages(listOf(message.id))
+                                            shouldNotify = false
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (shouldNotify) {
+                                val conversation = conversationRepo.getOrCreateConversation(message.threadId)
+
+                                if (conversation == null) {
+                                    Timber.e("failed to get conversation for MMS")
+                                } else if (conversation.blocked) {
+                                    Timber.v("no notifications for blocked")
+                                } else {
+                                    // unarchive conversation if necessary
+                                    if (conversation.archived) {
+                                        Timber.v("conversation unarchived")
+                                        conversationRepo.markUnarchived(listOf(conversation.id))
+                                    }
+
+                                    // update/create notification
+                                    Timber.v("update/create notification")
+                                    notificationManager.update(conversation.id)
+
+                                    // update shortcuts
+                                    Timber.v("update shortcuts")
+                                    shortcutManager.updateShortcuts()
+                                    shortcutManager.getOrCreateShortcut(conversation.id)
+
+                                    // update the badge and widget
+                                    Timber.v("update badge and widget")
+                                    updateBadge.execute(Unit)
+                                }
+                            }
                         }
                     }
 
@@ -272,26 +300,21 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
         return Result.success()
     }
 
-    private fun classifyTextBlock(message: Message): ClassificationResult {
+    private fun classifyTextBlock(message: Message, isFromContact: Boolean): ClassificationResult {
         return inboundMessageClassifier.classify(
             InboundMessageForClassification(
                 address = message.address,
                 body = message.getText(),
                 timestampMillis = message.date,
                 isMms = message.isMms(),
-                isFromContact = contactsRepo.isContact(message.address),
+                isFromContact = isFromContact,
                 subscriptionId = message.subId
             )
         )
     }
 
-    private fun ClassificationResult.shouldSuppressNotification(): Boolean {
-        return when (action) {
-            FilterAction.ALLOW -> false
-            FilterAction.QUARANTINE,
-            FilterAction.BLOCK_CONVERSATION,
-            FilterAction.DROP -> true
-        }
+    private fun isTextBlockDropMode(): Boolean {
+        return prefs.textBlockFilterMode.get() == Preferences.TEXTBLOCK_FILTER_MODE_DROP
     }
 
     private fun ClassificationResult.toBlockReason(): String {
