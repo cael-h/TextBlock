@@ -51,5 +51,9 @@ data class SettingsState(
     val messageLinkHandlingSummary: String = "Ask before opening",
     val messageLinkHandlingId: Int = 2,
     val disableScreenshotsEnabled: Boolean = false,
+    val textBlockFilteringEnabled: Boolean = true,
+    val textBlockFilterModeSummary: String = "",
+    val textBlockFilterModeId: Int = Preferences.TEXTBLOCK_FILTER_MODE_QUARANTINE,
+    val textBlockAllowContactsEnabled: Boolean = true,
     val syncProgress: SyncRepository.SyncProgress = SyncRepository.SyncProgress.Idle
 )

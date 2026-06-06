@@ -143,6 +143,25 @@ class SettingsPresenter @Inject constructor(
         disposables += prefs.disableScreenshots.asObservable()
             .subscribe { enabled -> newState { copy(disableScreenshotsEnabled = enabled) } }
 
+        disposables += prefs.textBlockFiltering.asObservable()
+            .subscribe { enabled -> newState { copy(textBlockFilteringEnabled = enabled) } }
+
+        val textBlockFilterModeLabels = context.resources.getStringArray(R.array.textblock_filter_modes)
+        val textBlockFilterModeIds = context.resources.getIntArray(R.array.textblock_filter_mode_ids)
+        disposables += prefs.textBlockFilterMode.asObservable()
+            .subscribe { mode ->
+                val index = textBlockFilterModeIds.indexOf(mode).takeIf { it >= 0 } ?: 0
+                newState {
+                    copy(
+                        textBlockFilterModeSummary = textBlockFilterModeLabels[index],
+                        textBlockFilterModeId = mode
+                    )
+                }
+            }
+
+        disposables += prefs.textBlockAllowContacts.asObservable()
+            .subscribe { enabled -> newState { copy(textBlockAllowContactsEnabled = enabled) } }
+
         disposables += syncRepo.syncProgress
                 .sample(16, TimeUnit.MILLISECONDS)
                 .distinctUntilChanged()
@@ -216,6 +235,12 @@ class SettingsPresenter @Inject constructor(
 
                         R.id.disableScreenshots -> prefs.disableScreenshots.set(!prefs.disableScreenshots.get())
 
+                        R.id.textBlockFiltering -> prefs.textBlockFiltering.set(!prefs.textBlockFiltering.get())
+
+                        R.id.textBlockFilterMode -> view.showTextBlockFilterModeDialog()
+
+                        R.id.textBlockAllowContacts -> prefs.textBlockAllowContacts.set(!prefs.textBlockAllowContacts.get())
+
                         R.id.sync -> syncMessages.execute(Unit)
 
                         R.id.about -> view.showAbout()
@@ -283,6 +308,10 @@ class SettingsPresenter @Inject constructor(
         view.messageLinkHandlingSelected()
             .autoDisposable(view.scope())
             .subscribe(prefs.messageLinkHandling::set)
+
+        view.textBlockFilterModeSelected()
+            .autoDisposable(view.scope())
+            .subscribe(prefs.textBlockFilterMode::set)
     }
 
 }

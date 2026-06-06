@@ -117,6 +117,43 @@
 
         <dev.octoshrimpy.quik.common.widget.QkTextView
             style="@style/PreferenceCategory"
+            android:text="@string/settings_category_textblock" />
+
+        <dev.octoshrimpy.quik.common.widget.PreferenceView
+            android:id="@+id/textBlockFiltering"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_block_white_24dp"
+            app:summary="@string/settings_textblock_filtering_summary"
+            app:title="@string/settings_textblock_filtering_title"
+            app:widget="@layout/settings_switch_widget" />
+
+        <dev.octoshrimpy.quik.common.widget.PreferenceView
+            android:id="@+id/textBlockFilterMode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_inbox_black_24dp"
+            app:summary="@string/settings_textblock_filter_mode_quarantine"
+            app:title="@string/settings_textblock_filter_mode_title" />
+
+        <dev.octoshrimpy.quik.common.widget.PreferenceView
+            android:id="@+id/textBlockAllowContacts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_people_black_24dp"
+            app:summary="@string/settings_textblock_allow_contacts_summary"
+            app:title="@string/settings_textblock_allow_contacts_title"
+            app:widget="@layout/settings_switch_widget" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:background="?android:attr/divider" />
+
+        <dev.octoshrimpy.quik.common.widget.QkTextView
+            style="@style/PreferenceCategory"
             android:text="@string/settings_category_general" />
 
         <dev.octoshrimpy.quik.common.widget.PreferenceView

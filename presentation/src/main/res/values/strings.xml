@@ -263,6 +263,7 @@
     <string name="settings_category_appearance">Appearance</string>
     <string name="settings_category_general">General</string>
     <string name="settings_category_qkreply">QK Reply</string>
+    <string name="settings_category_textblock">TextBlock</string>
 
     <string name="settings_theme_title">Theme</string>
     <string name="settings_night_title">Night mode</string>
@@ -335,6 +336,13 @@
     <string name="settings_mms_weblink_title">Link handling in messages</string>
     <string name="settings_disable_screenshots_title">Disable Screenshots</string>
     <string name="settings_diable_screenshots_summary">Prevent your OS and other apps from taking screenshots of the app.</string>
+    <string name="settings_textblock_filtering_title">Political spam filtering</string>
+    <string name="settings_textblock_filtering_summary">Filter political spam locally on this device</string>
+    <string name="settings_textblock_filter_mode_title">Filtered message action</string>
+    <string name="settings_textblock_filter_mode_quarantine">Quarantine</string>
+    <string name="settings_textblock_filter_mode_drop">Drop</string>
+    <string name="settings_textblock_allow_contacts_title">Allow contacts</string>
+    <string name="settings_textblock_allow_contacts_summary">Never filter messages from saved contacts</string>
     <string name="settings_sync_title">Sync messages</string>
     <string name="settings_sync_summary">Re-sync your messages with the native Android SMS database</string>
     <string name="settings_about_title">About TextBlock</string>
@@ -583,6 +591,16 @@
         <item>0</item>
         <item>1</item>
         <item>2</item>
+    </integer-array>
+
+    <string-array name="textblock_filter_modes">
+        <item>@string/settings_textblock_filter_mode_quarantine</item>
+        <item>@string/settings_textblock_filter_mode_drop</item>
+    </string-array>
+
+    <integer-array name="textblock_filter_mode_ids">
+        <item>0</item>
+        <item>1</item>
     </integer-array>
 
     <string-array name="qk_responses">
