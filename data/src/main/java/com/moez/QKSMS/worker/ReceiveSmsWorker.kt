@@ -34,8 +34,8 @@ import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.textblock.ClassificationResult
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
-import dev.octoshrimpy.quik.textblock.TextBlockFilterDecision
-import dev.octoshrimpy.quik.textblock.TextBlockFilterPolicy
+import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
+import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import javax.inject.Inject
@@ -107,38 +107,34 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
         conversationRepo.updateConversations(listOf(message.threadId))
 
         val senderIsContact = contactsRepo.isContact(message.address)
-        if (TextBlockFilterPolicy.shouldClassify(
-                filteringEnabled = prefs.textBlockFiltering.get(),
-                allowContacts = prefs.textBlockAllowContacts.get(),
-                isFromContact = senderIsContact
-            )
-        ) {
-            val textBlockResult = classifyTextBlock(
-                message,
-                TextBlockFilterPolicy.isFromContactForClassifier(
-                    allowContacts = prefs.textBlockAllowContacts.get(),
-                    isFromContact = senderIsContact
+        val textBlockDecision = TextBlockReceivePolicy.evaluate(
+            filteringEnabled = prefs.textBlockFiltering.get(),
+            allowContacts = prefs.textBlockAllowContacts.get(),
+            isFromContact = senderIsContact,
+            dropMode = isTextBlockDropMode()
+        ) { isFromContactForClassifier ->
+            classifyTextBlock(message, isFromContactForClassifier)
+        }
+        when (textBlockDecision.effect) {
+            TextBlockReceiveEffect.ALLOW -> Unit
+
+            TextBlockReceiveEffect.QUARANTINE -> {
+                val textBlockResult = textBlockDecision.requireClassificationResult()
+                Timber.v("TextBlock quarantined SMS as ${textBlockResult.action}")
+                messageRepo.markRead(listOf(message.threadId))
+                conversationRepo.markBlocked(
+                    listOf(message.threadId),
+                    prefs.blockingManager.get(),
+                    textBlockResult.toBlockReason()
                 )
-            )
-            when (TextBlockFilterPolicy.actionFor(textBlockResult, isTextBlockDropMode())) {
-                TextBlockFilterDecision.ALLOW -> Unit
+                return Result.failure(inputData)
+            }
 
-                TextBlockFilterDecision.QUARANTINE -> {
-                    Timber.v("TextBlock quarantined SMS as ${textBlockResult.action}")
-                    messageRepo.markRead(listOf(message.threadId))
-                    conversationRepo.markBlocked(
-                        listOf(message.threadId),
-                        prefs.blockingManager.get(),
-                        textBlockResult.toBlockReason()
-                    )
-                    return Result.failure(inputData)
-                }
-
-                TextBlockFilterDecision.DROP -> {
-                    Timber.v("TextBlock dropped SMS as ${textBlockResult.action}")
-                    messageRepo.deleteMessages(listOf(message.id))
-                    return Result.failure(inputData)
-                }
+            TextBlockReceiveEffect.DROP -> {
+                val textBlockResult = textBlockDecision.requireClassificationResult()
+                Timber.v("TextBlock dropped SMS as ${textBlockResult.action}")
+                messageRepo.deleteMessages(listOf(message.id))
+                return Result.failure(inputData)
             }
         }
 

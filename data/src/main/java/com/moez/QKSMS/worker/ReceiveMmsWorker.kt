@@ -58,8 +58,9 @@ import dev.octoshrimpy.quik.repository.SyncRepository
 import dev.octoshrimpy.quik.textblock.ClassificationResult
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
-import dev.octoshrimpy.quik.textblock.TextBlockFilterDecision
-import dev.octoshrimpy.quik.textblock.TextBlockFilterPolicy
+import dev.octoshrimpy.quik.textblock.TextBlockMmsPostPersistencePlan
+import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
+import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import java.io.File
@@ -157,6 +158,8 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
 
                 // if message was persisted ok
                 if (messageUri != null) {
+                    var mmsPostPersistencePlan = TextBlockMmsPostPersistencePlan.NotifyUser
+
                     // Sync the message
                     val message = syncRepo.syncMessage(messageUri)
                     if (message == null) {
@@ -210,38 +213,37 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                                 conversationRepo.updateConversations(listOf(message.threadId))
 
                                 val senderIsContact = contactsRepo.isContact(message.address)
-                                if (TextBlockFilterPolicy.shouldClassify(
-                                        filteringEnabled = prefs.textBlockFiltering.get(),
-                                        allowContacts = prefs.textBlockAllowContacts.get(),
-                                        isFromContact = senderIsContact
-                                    )
-                                ) {
-                                    val textBlockResult = classifyTextBlock(
-                                        message,
-                                        TextBlockFilterPolicy.isFromContactForClassifier(
-                                            allowContacts = prefs.textBlockAllowContacts.get(),
-                                            isFromContact = senderIsContact
+                                val textBlockDecision = TextBlockReceivePolicy.evaluate(
+                                    filteringEnabled = prefs.textBlockFiltering.get(),
+                                    allowContacts = prefs.textBlockAllowContacts.get(),
+                                    isFromContact = senderIsContact,
+                                    dropMode = isTextBlockDropMode()
+                                ) { isFromContactForClassifier ->
+                                    classifyTextBlock(message, isFromContactForClassifier)
+                                }
+                                mmsPostPersistencePlan =
+                                    TextBlockReceivePolicy.mmsPostPersistencePlan(textBlockDecision)
+                                shouldNotify = mmsPostPersistencePlan.shouldNotifyUser
+                                when (textBlockDecision.effect) {
+                                    TextBlockReceiveEffect.ALLOW -> Unit
+
+                                    TextBlockReceiveEffect.QUARANTINE -> {
+                                        val textBlockResult =
+                                            textBlockDecision.requireClassificationResult()
+                                        Timber.v("TextBlock quarantined MMS as ${textBlockResult.action}")
+                                        messageRepo.markRead(listOf(message.threadId))
+                                        conversationRepo.markBlocked(
+                                            listOf(message.threadId),
+                                            prefs.blockingManager.get(),
+                                            textBlockResult.toBlockReason()
                                         )
-                                    )
-                                    when (TextBlockFilterPolicy.actionFor(textBlockResult, isTextBlockDropMode())) {
-                                        TextBlockFilterDecision.ALLOW -> Unit
+                                    }
 
-                                        TextBlockFilterDecision.QUARANTINE -> {
-                                            Timber.v("TextBlock quarantined MMS as ${textBlockResult.action}")
-                                            messageRepo.markRead(listOf(message.threadId))
-                                            conversationRepo.markBlocked(
-                                                listOf(message.threadId),
-                                                prefs.blockingManager.get(),
-                                                textBlockResult.toBlockReason()
-                                            )
-                                            shouldNotify = false
-                                        }
-
-                                        TextBlockFilterDecision.DROP -> {
-                                            Timber.v("TextBlock dropped MMS as ${textBlockResult.action}")
-                                            messageRepo.deleteMessages(listOf(message.id))
-                                            shouldNotify = false
-                                        }
+                                    TextBlockReceiveEffect.DROP -> {
+                                        val textBlockResult =
+                                            textBlockDecision.requireClassificationResult()
+                                        Timber.v("TextBlock dropped MMS as ${textBlockResult.action}")
+                                        messageRepo.deleteMessages(listOf(message.id))
                                     }
                                 }
                             }
@@ -278,10 +280,14 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                     }
 
                     // send ack to mmsc
-                    sendAcknowledgeInd(applicationContext, subscriptionId, notificationInd)
+                    if (mmsPostPersistencePlan.shouldSendAcknowledgeInd) {
+                        sendAcknowledgeInd(applicationContext, subscriptionId, notificationInd)
+                    }
 
                     // send notify ind to mmsc
-                    sendNotifyRespInd(applicationContext, subscriptionId, notificationInd)
+                    if (mmsPostPersistencePlan.shouldSendNotifyRespInd) {
+                        sendNotifyRespInd(applicationContext, subscriptionId, notificationInd)
+                    }
                 }
             }
             else Timber.e("empty mms data")
