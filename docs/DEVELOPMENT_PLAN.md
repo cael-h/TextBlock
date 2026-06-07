@@ -148,25 +148,31 @@ and 34, accepted licenses, platform-tools, and build-tools backed by Termux
 Android tool packages.
 
 Use `scripts/check-android-build-env.sh` for non-mutating local checks. With the
-Termux shim, Gradle task discovery and focused domain unit tests can be verified
-locally:
+Termux shim, Gradle task discovery, focused domain unit tests, debug APK
+assembly, and lint can be verified locally:
 
 ```sh
 export ANDROID_HOME=/data/data/com.termux/files/home/android-sdk-termux
 ./scripts/check-android-build-env.sh
 ./gradlew tasks --all -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+./gradlew --no-daemon :presentation:assembleDebug -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+./gradlew --no-daemon lint -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
 ```
 
-Full APK assembly and lint still need verification in Termux or desktop/CI:
+Slice M verified APK assembly and lint in Termux on June 7, 2026:
 
-```sh
-./gradlew --no-daemon :presentation:assembleDebug
-./gradlew --no-daemon test
-./gradlew --no-daemon lint
-```
+- Environment check: 23 pass, 1 warning, 0 failures.
+- `:presentation:assembleDebug`: passed in 4m44s.
+- APK artifact:
+  `presentation/build/outputs/apk/debug/TextBlock-v4.3.6-debug.apk`.
+- `lint`: passed in 23m46s.
+- Install remains unverified because `adb devices` reported no attached
+  device or emulator rows.
 
-See `docs/slices/android-build-env-plan.md` for Termux package notes, fallback
-SDK setup commands, and current blockers.
+See `docs/slices/android-build-env-plan.md` for Termux package notes and
+fallback SDK setup commands. See
+`docs/slices/textblock-apk-verification-plan.md` for exact APK, lint, ADB, and
+install verification evidence.
 
 ## Sample-Derived Rules
 
