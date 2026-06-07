@@ -24,7 +24,7 @@ The current foundation is complete:
 - Add classifier tests without committing raw user text samples.
 - Keep documentation current and reviewable.
 
-## Current Milestone Batch 2
+## Completed Milestone Batch 2
 
 Purpose:
 
@@ -45,17 +45,37 @@ Main goals:
   whether full compile/test verification is possible locally.
 - [x] Update docs so milestone status reflects the code that now exists.
 
+## Completed Milestone Batch 3
+
+Purpose:
+
+Turn the TextBlock filter from a one-way quarantine mechanism into a reviewable,
+correctable local spam workflow, then verify that the app can be built and
+tested deeply enough to hand to a phone.
+
+Main goals:
+
+- [x] Wire local correction decisions into the classifier policy so "Not spam"
+  and "Block similar" decisions affect future classification without storing raw
+  message bodies.
+- [x] Add blocked-message review actions that can record TextBlock corrections
+  from the existing quarantine surface.
+- [x] Add focused receive-path tests or seams for SMS/MMS branch behavior,
+  including MMS ACK/notify preservation.
+- [x] Verify APK assembly, lint where possible, and connected device/emulator
+  install readiness.
+
 ## Current Status
 
 - Branch: `textblock-filter-foundation`
-- Local integration head: batch 2 merged locally; pending final verification and push
-- Latest pushed commit before batch 2: `645cd228 Mark dev manager milestone pushed`
+- Local integration head: batch 3 merged locally; pending final docs commit and push
+- Latest pushed commit: `32d06eaf Document batch 2 dev manager review`
 - Worktree support: available
 - Java status: OpenJDK 17.0.19 installed and `./gradlew --version` works.
-- Android SDK status: local Termux shim at `/data/data/com.termux/files/home/android-sdk-termux` supports task discovery, targeted domain unit tests, and targeted data/presentation Kotlin compile when `ANDROID_HOME` is set and `-Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2` is supplied. Full APK assembly/lint remains unverified.
+- Android SDK status: local Termux shim at `/data/data/com.termux/files/home/android-sdk-termux` supports task discovery, focused domain unit tests, data/presentation Kotlin compile, debug APK assembly, and lint when `ANDROID_HOME` is set and `-Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2` is supplied. Device install remains unverified because no ADB target is attached.
 - Upstream status: `upstream/master` has no new commits relative to the current base; local branch is ahead only with TextBlock work.
 - Automation status: no scheduler/automation tool is available in this session, so 20-minute checks will be manual.
-- Multi-agent status: subagent tools are available.
+- Multi-agent status: batch 3 workers and reviewer completed; pending cleanup.
 
 ## Parallel Slice Plan
 
@@ -345,11 +365,204 @@ Result:
 - `./gradlew tasks --all` passes with the SDK shim and Termux `aapt2` override.
 - Full APK assembly and lint remain unverified.
 
-Deferred until Slice G stabilizes:
+Batch 3 developer slices:
 
-- Dedicated quarantine/review UI and correction actions in the blocked messages
-  screen. This will likely touch `presentation/src/main/java/.../feature/blocking/messages/`
-  and should not run concurrently with correction API design.
+### Slice J: Correction-Aware Classifier Policy
+
+Owner: Bohr (`019ea04e-1a9d-7bc3-a93b-73799577c709`)
+
+Status: merged
+
+Branch/worktree:
+
+- `textblock-correction-policy`
+- `../quik-textblock-correction-policy`
+
+Goal:
+
+- Add a correction-aware classifier or policy wrapper behind
+  `InboundMessageClassifier`.
+- Preserve existing rule-based classifier behavior when no correction matches.
+- Make `NOT_SPAM` force allow and `BLOCK_SIMILAR` quarantine/block similar
+  before default classifier output.
+- Keep correction records privacy-preserving and avoid raw body persistence.
+
+Likely files:
+
+- `domain/src/main/java/com/moez/QKSMS/textblock/**`
+- `domain/src/main/java/com/moez/QKSMS/textblock/correction/**`
+- tests under `domain/src/test/java/dev/octoshrimpy/quik/textblock/**`
+- `docs/slices/textblock-correction-policy-plan.md`
+
+Non-goals:
+
+- Presentation UI.
+- Receive-worker edits.
+- Durable storage implementation beyond the existing local boundary unless a
+  minimal in-memory provider is required for integration.
+
+Dependencies:
+
+- Uses Slice G correction models.
+
+Result:
+
+- Added `CorrectionAwareInboundMessageClassifier`.
+- Wrapped app classifier provider with a singleton in-memory `CorrectionStore`.
+- Added focused correction-aware classifier tests.
+- Tests passed: focused TextBlock domain tests and `:presentation:compileDebugKotlin`.
+- Worker commit: `75a8a247 Add correction-aware textblock classifier`.
+- Reviewer found no implementation issues.
+- Merged via `f328e641 Merge correction-aware classifier policy slice`.
+
+### Slice K: Quarantine Review Actions
+
+Owner: Socrates (`019ea04e-1cc1-7550-b2b6-26627583d7b0`)
+
+Status: merged
+
+Branch/worktree:
+
+- `textblock-quarantine-actions`
+- `../quik-textblock-quarantine-actions`
+
+Goal:
+
+- Add user-facing correction actions to the existing blocked-message review
+  surface.
+- Provide "Not spam" and "Block similar" affordances for selected blocked
+  conversations/messages where enough local message text exists to derive
+  correction signals.
+- Keep the UI small and consistent with QUIK's existing blocked-message flow.
+
+Likely files:
+
+- `presentation/src/main/java/com/moez/QKSMS/feature/blocking/messages/**`
+- `presentation/src/main/res/menu/blocked_messages.xml`
+- `presentation/src/main/res/values/strings.xml`
+- optional focused presenter tests if the project has a nearby test pattern
+- `docs/slices/textblock-quarantine-actions-plan.md`
+
+Non-goals:
+
+- Domain classifier policy.
+- Receive-worker behavior.
+- New database schema.
+
+Dependencies:
+
+- Calls the Slice J correction API shape if available; if Slice J is not yet
+  merged, define a minimal UI boundary and document the pending integration.
+
+Result:
+
+- Added selected blocked-message actions for "Not spam" and "Block similar".
+- Added local correction-signal derivation from latest incoming local message
+  text plus user feedback for saved or unavailable corrections.
+- Presentation compile passed; no focused presentation tests exist nearby.
+- Worker commit: `e234f28a Add TextBlock quarantine correction actions`.
+- Reviewer found a high issue: the first implementation wrote corrections into
+  a private `InMemoryCorrectionStore` instead of the app graph store used by the
+  correction-aware classifier.
+- Worker fixed the finding by injecting `CorrectionStore` into
+  `TextBlockCorrectionReview`; fix commit:
+  `1a9d6506 Share TextBlock correction store with app graph`.
+- Merged via `6b238c61 Merge quarantine correction actions slice` with the
+  expected `AppModule` conflict resolved to keep one singleton
+  `CorrectionStore` and one correction-aware classifier provider.
+
+### Slice L: Receive-Path Test Seams
+
+Owner: Halley (`019ea04e-1e32-7201-9aca-f3d5a166de0a`)
+
+Status: merged
+
+Branch/worktree:
+
+- `textblock-receive-tests`
+- `../quik-textblock-receive-tests`
+
+Goal:
+
+- Add focused tests or extracted testable helpers for SMS/MMS TextBlock branch
+  behavior.
+- Cover filtering disabled, contact allowlist, quarantine mode, drop mode, and
+  MMS ACK/notify preservation by avoiding early returns after persisted MMS
+  suppression.
+
+Likely files:
+
+- `data/src/main/java/com/moez/QKSMS/worker/ReceiveSmsWorker.kt`
+- `data/src/main/java/com/moez/QKSMS/worker/ReceiveMmsWorker.kt`
+- new testable helper files under `data/src/main/java/.../worker/` or
+  `domain/src/main/java/com/moez/QKSMS/textblock/`
+- tests under `domain/src/test/java/...` or new module test sources if feasible
+- `docs/slices/textblock-receive-tests-plan.md`
+
+Non-goals:
+
+- UI changes.
+- Classifier rule changes.
+- Device/emulator testing.
+
+Dependencies:
+
+- Must coordinate with Slice J if both touch classification decision helpers.
+  Prefer extracting helper logic in a distinct file to minimize worker conflicts.
+
+Result:
+
+- Added `TextBlockReceivePolicy` and focused domain tests.
+- SMS/MMS workers now use the helper for TextBlock receive decisions.
+- Tests passed: focused TextBlock domain tests and `:data:compileDebugKotlin`.
+- Worker commit: `836932c7 Add TextBlock receive decision test seams`.
+- Reviewer found no implementation issues.
+- Merged via `eba1cbf4 Merge receive decision test seam slice`.
+
+### Slice M: APK/Lint/Install Verification
+
+Owner: Parfit (`019ea04e-1f9d-7a23-808d-d39ab8871285`) plus manager/local critical path
+
+Status: merged
+
+Branch/worktree:
+
+- `textblock-apk-verification`
+- `../quik-textblock-apk-verification`
+
+Goal:
+
+- Run `:presentation:assembleDebug` with the Termux SDK shim and AAPT2 override.
+- Run lint or identify the specific local blocker.
+- Check for a connected Android device/emulator and attempt install only if one
+  is present and safe to use.
+- Document exact commands, pass/fail evidence, artifacts, and blockers.
+
+Likely files:
+
+- `docs/slices/textblock-apk-verification-plan.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- optional scripts only if they are non-mutating and reusable
+
+Non-goals:
+
+- Functional code changes.
+- Committing APK artifacts.
+- Installing on a device without a connected target.
+
+Result:
+
+- Build environment check passed with 23 pass, 1 warning, 0 failures.
+- `:presentation:assembleDebug` passed and produced
+  `presentation/build/outputs/apk/debug/TextBlock-v4.3.6-debug.apk`.
+- `lint` passed in the Termux SDK shim environment.
+- `adb devices` found no attached device, so install was intentionally skipped.
+- Worker commit: `d725bd88 Document APK verification results`.
+- Reviewer found a medium issue: `docs/DEVELOPMENT_PLAN.md` still had stale
+  build-status text saying Gradle/Java was not ready.
+- Worker fixed the stale status; fix commit:
+  `306eea55 Fix APK verification build status docs`.
+- Merged via `4250b6bc Merge APK verification slice`.
 
 ## Manual Progress Check Cadence
 
@@ -384,6 +597,10 @@ Merge result:
 - `textblock-llm-adapter` merged in batch 2.
 - `textblock-settings-controls` merged in batch 2.
 - `textblock-build-env` merged in batch 2.
+- `textblock-correction-policy` merged via `f328e641`.
+- `textblock-quarantine-actions` merged via `6b238c61`.
+- `textblock-receive-tests` merged via `eba1cbf4`.
+- `textblock-apk-verification` merged via `4250b6bc`.
 
 ## Risk Register
 
@@ -403,12 +620,28 @@ Merge result:
 - `:data:compileDebugKotlin :presentation:compileDebugKotlin` passed on the settings branch.
 - Full APK assembly, lint, and device/emulator receive-path testing remain pending.
 
+## Batch 3 Integrated Verification
+
+- `:domain:testDebugUnitTest --tests 'dev.octoshrimpy.quik.textblock.*'` passed on the merged branch.
+- `:data:compileDebugKotlin :presentation:compileDebugKotlin` passed on the merged branch.
+- `:presentation:assembleDebug` passed on the merged branch and produced
+  `presentation/build/outputs/apk/debug/TextBlock-v4.3.6-debug.apk`.
+- `lint` passed on the merged branch.
+- `adb devices` returned no attached device rows, so install was intentionally
+  skipped.
+- `git diff --check` passed.
+
 ## Next Slices
 
-- Dedicated TextBlock quarantine/review UI and correction actions in the blocked messages flow.
-- Wire correction decisions into classification policy.
-- Add worker-level tests for SMS/MMS receive branch behavior and MMS ACK/notify preservation.
-- Verify `:presentation:assembleDebug`, lint, and install on a connected Android device or emulator.
+- Install on an attached Android phone or emulator and validate default-SMS,
+  inbound SMS, inbound MMS ACK/notify, quarantine review, "Not spam", and "Block
+  similar" flows end to end.
+- Replace the current in-memory `CorrectionStore` with durable local storage so
+  corrections survive process death and app restart.
+- Add worker-level or instrumented tests for SMS/MMS repository side effects and
+  carrier ACK/notify behavior.
+- Decide whether "Not spam" should also unblock/restore the current quarantined
+  conversation or only affect future classification.
 
 ## Completion Criteria For This Milestone
 
