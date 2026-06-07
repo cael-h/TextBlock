@@ -58,6 +58,8 @@
     <string name="main_menu_read">Mark read</string>
     <string name="main_menu_unread">Mark unread</string>
     <string name="main_menu_block">Block</string>
+    <string name="main_menu_not_spam">Not spam</string>
+    <string name="main_menu_block_similar">Block similar</string>
     <string name="main_menu_send_now">Send now</string>
     <string name="main_menu_edit_message">Edit message</string>
     <string name="main_menu_rename_conversation">Rename conversation</string>
@@ -387,6 +389,15 @@
 
     <string name="blocked_messages_title">Blocked messages</string>
     <string name="blocked_messages_empty">Your blocked messages will appear here</string>
+    <plurals name="textblock_correction_not_spam_saved">
+        <item quantity="one">Marked %d conversation as not spam</item>
+        <item quantity="other">Marked %d conversations as not spam</item>
+    </plurals>
+    <plurals name="textblock_correction_block_similar_saved">
+        <item quantity="one">Saved Block similar for %d conversation</item>
+        <item quantity="other">Saved Block similar for %d conversations</item>
+    </plurals>
+    <string name="textblock_correction_no_text">No local message text available for TextBlock correction</string>
 
     <string name="blocking_block_title">Block</string>
     <string name="blocking_unblock_title">Unblock</string>

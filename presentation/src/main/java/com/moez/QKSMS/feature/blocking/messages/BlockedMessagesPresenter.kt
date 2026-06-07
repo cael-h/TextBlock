@@ -26,12 +26,14 @@ import dev.octoshrimpy.quik.common.Navigator
 import dev.octoshrimpy.quik.common.base.QkPresenter
 import dev.octoshrimpy.quik.interactor.DeleteConversations
 import dev.octoshrimpy.quik.repository.ConversationRepository
+import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import javax.inject.Inject
 
 class BlockedMessagesPresenter @Inject constructor(
     conversationRepo: ConversationRepository,
     private val blockingClient: BlockingClient,
     private val deleteConversations: DeleteConversations,
+    private val textBlockCorrectionReview: TextBlockCorrectionReview,
     private val navigator: Navigator
 ) : QkPresenter<BlockedMessagesView, BlockedMessagesState>(BlockedMessagesState(
         data = conversationRepo.getBlockedConversationsAsync()
@@ -53,6 +55,12 @@ class BlockedMessagesPresenter @Inject constructor(
                         }
                         R.id.delete -> {
                             view.showDeleteDialog(conversations)
+                        }
+                        R.id.not_spam -> {
+                            recordTextBlockCorrection(view, CorrectionAction.NOT_SPAM, conversations)
+                        }
+                        R.id.block_similar -> {
+                            recordTextBlockCorrection(view, CorrectionAction.BLOCK_SIMILAR, conversations)
                         }
                     }
 
@@ -84,6 +92,19 @@ class BlockedMessagesPresenter @Inject constructor(
                 }
                 .autoDisposable(view.scope())
                 .subscribe()
+    }
+
+    private fun recordTextBlockCorrection(
+        view: BlockedMessagesView,
+        action: CorrectionAction,
+        conversations: List<Long>
+    ) {
+        val result = textBlockCorrectionReview.record(action, conversations)
+        view.showTextBlockCorrectionResult(action, result)
+
+        if (result.saved > 0) {
+            view.clearSelection()
+        }
     }
 
 }
