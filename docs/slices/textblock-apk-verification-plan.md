@@ -192,6 +192,15 @@ git diff --check
 
 Result: pass. No whitespace errors were reported.
 
+### 2026-06-07 Review Follow-Up
+
+Review finding: medium documentation consistency issue in
+`docs/DEVELOPMENT_PLAN.md`.
+
+Result: implemented. The stale later `Build Status` section now points to the
+verified Java 17, Termux SDK shim, `assembleDebug`, lint, and no-device install
+status instead of the old Java-missing blocker.
+
 ## Results
 
 - Termux environment check passed with the SDK shim.

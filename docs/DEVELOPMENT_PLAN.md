@@ -284,15 +284,29 @@ Potential Android runtime targets:
 
 ## Build Status
 
-As of this setup, Gradle was not run successfully in Termux because Java is not
-installed/configured:
+The Termux/aarch64 environment now has Java 17 and a manager-provisioned Android
+SDK shim at `/data/data/com.termux/files/home/android-sdk-termux`. On June 7,
+2026, Slice M verified that this environment can build and lint the debug app
+with the local AAPT2 override:
 
-```text
-ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+```sh
+export ANDROID_HOME=/data/data/com.termux/files/home/android-sdk-termux
+./scripts/check-android-build-env.sh
+./gradlew --no-daemon :presentation:assembleDebug -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
+./gradlew --no-daemon lint -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2
 ```
 
-Before Android build verification, install/configure a JDK and Android SDK tools
-for this Termux environment.
+Current verified status:
+
+- Environment check: passed with 23 pass, 1 warning, 0 failures.
+- Debug APK assembly: passed; artifact
+  `presentation/build/outputs/apk/debug/TextBlock-v4.3.6-debug.apk`.
+- Lint: passed.
+- Device install: not yet verified because `adb devices` reported no connected
+  Android device or emulator rows.
+
+See `docs/slices/textblock-apk-verification-plan.md` for the full command log,
+artifact path, lint report paths, and install blocker.
 
 ## Useful Commands
 
