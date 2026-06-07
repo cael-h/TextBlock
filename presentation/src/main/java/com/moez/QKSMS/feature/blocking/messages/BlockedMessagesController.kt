@@ -25,6 +25,7 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
 import dev.octoshrimpy.quik.R
@@ -33,6 +34,7 @@ import dev.octoshrimpy.quik.common.util.Colors
 import dev.octoshrimpy.quik.databinding.BlockedMessagesControllerBinding
 import dev.octoshrimpy.quik.feature.blocking.BlockingDialog
 import dev.octoshrimpy.quik.injection.appComponent
+import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import io.reactivex.subjects.PublishSubject
 import io.reactivex.subjects.Subject
 import javax.inject.Inject
@@ -97,6 +99,8 @@ class BlockedMessagesController : QkController<BlockedMessagesControllerBinding,
         val toolbarMenu = themedActivity?.findViewById<Toolbar>(R.id.toolbar)?.menu
         toolbarMenu?.findItem(R.id.block)?.isVisible = state.selected > 0
         toolbarMenu?.findItem(R.id.delete)?.isVisible = state.selected > 0
+        toolbarMenu?.findItem(R.id.not_spam)?.isVisible = state.selected > 0
+        toolbarMenu?.findItem(R.id.block_similar)?.isVisible = state.selected > 0
 
         setTitle(when (state.selected) {
             0 -> context.getString(R.string.blocked_messages_title)
@@ -118,6 +122,24 @@ class BlockedMessagesController : QkController<BlockedMessagesControllerBinding,
                 .setPositiveButton(R.string.button_delete) { _, _ -> confirmDeleteIntent.onNext(conversations) }
                 .setNegativeButton(R.string.button_cancel, null)
                 .show()
+    }
+
+    override fun showTextBlockCorrectionResult(action: CorrectionAction, result: TextBlockCorrectionReviewResult) {
+        val message = when {
+            result.saved == 0 -> context.getString(R.string.textblock_correction_no_text)
+            action == CorrectionAction.NOT_SPAM -> resources?.getQuantityString(
+                R.plurals.textblock_correction_not_spam_saved,
+                result.saved,
+                result.saved
+            )
+            else -> resources?.getQuantityString(
+                R.plurals.textblock_correction_block_similar_saved,
+                result.saved,
+                result.saved
+            )
+        } ?: return
+
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
     override fun goBack() {

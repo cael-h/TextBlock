@@ -19,6 +19,7 @@
 package dev.octoshrimpy.quik.feature.blocking.messages
 
 import dev.octoshrimpy.quik.common.base.QkViewContract
+import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import io.reactivex.Observable
 
 interface BlockedMessagesView : QkViewContract<BlockedMessagesState> {
@@ -33,6 +34,7 @@ interface BlockedMessagesView : QkViewContract<BlockedMessagesState> {
     fun clearSelection()
     fun showBlockingDialog(conversations: List<Long>, block: Boolean)
     fun showDeleteDialog(conversations: List<Long>)
+    fun showTextBlockCorrectionResult(action: CorrectionAction, result: TextBlockCorrectionReviewResult)
     fun goBack()
 
 }
