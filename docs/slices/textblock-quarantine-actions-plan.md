@@ -38,10 +38,11 @@ correction-policy slice.
   - return saved/skipped counts for presenter/UI feedback.
 - Do not change `domain/src/main/java/com/moez/QKSMS/textblock/**`.
 - Do not change receive workers or classifier decision behavior.
-- Avoid broad `AppModule.kt` wiring if the branch lacks a final persistent
-  correction provider. If provider wiring is required for compile-safe local UI,
-  keep it minimal and document that correction-policy must replace it with final
-  persistence/classifier integration.
+- Keep `AppModule.kt` wiring minimal if the branch lacks a final persistent
+  correction provider. The local branch provides a singleton `CorrectionStore`
+  so UI corrections write through Dagger instead of a private helper store.
+  The correction-policy merge should connect that same store to the final
+  correction-aware classifier/persistence shape.
 
 ## Checklist
 
@@ -60,10 +61,10 @@ correction-policy slice.
 
 ## Risks
 
-- The current branch has correction domain models and an in-memory store, but no
-  visible persisted correction provider or receive-worker consumption path. This
-  slice must avoid duplicating the correction-policy worker's final singleton
-  shape.
+- The current branch has correction domain models and a Dagger singleton
+  in-memory store, but no visible persisted correction provider or
+  receive-worker consumption path. This slice must avoid duplicating the
+  correction-policy worker's final classifier/persistence shape.
 - Block similar uses token-signature matching and can be broader than exact body
   matching. The UI should label it clearly and only derive signals from local
   text that already exists on device.
@@ -93,15 +94,28 @@ correction-policy slice.
   recovered from a Kotlin daemon crash by using Gradle's fallback compiler.
 - `git diff --check` passed.
 
+## Review Finding Status
+
+- Resolved: the high-severity review finding about corrections being saved to a
+  private helper store was valid.
+- `TextBlockCorrectionReview` now injects `CorrectionStore` through Dagger and
+  no longer allocates `InMemoryCorrectionStore()` locally.
+- `AppModule` provides a singleton `CorrectionStore` for this branch so the UI
+  writes through the same app graph entry point that Slice J's correction-aware
+  classifier can read after merge.
+- Follow-up required compile passed:
+  `ANDROID_HOME=/data/data/com.termux/files/home/android-sdk-termux ./gradlew :presentation:compileDebugKotlin -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2`
+- Follow-up `git diff --check` passed.
+
 ## Pending Integration
 
 - `TextBlockCorrectionReview` uses the existing public `CorrectionStore` API
-  with the branch's in-memory implementation so this UI slice compiles without
-  broad provider changes.
+  with the branch's Dagger-provided singleton in-memory implementation so this
+  UI slice compiles without classifier policy changes.
 - The correction-policy slice still needs to supply the final persistent
   correction store and connect saved correction records to classifier decisions.
 - This slice intentionally does not change receive workers, classifier policy,
-  database schema, or `AppModule.kt`.
+  or database schema.
 
 ## Status
 
@@ -110,4 +124,5 @@ correction-policy slice.
 - UI implementation complete.
 - Required compile verification passed.
 - `git diff --check` passed.
+- Review finding fix compile verification passed.
 - Commit complete.

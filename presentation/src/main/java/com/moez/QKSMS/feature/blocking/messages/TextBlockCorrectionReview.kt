@@ -14,7 +14,6 @@ import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import dev.octoshrimpy.quik.textblock.correction.CorrectionSignals
 import dev.octoshrimpy.quik.textblock.correction.CorrectionStore
-import dev.octoshrimpy.quik.textblock.correction.InMemoryCorrectionStore
 import javax.inject.Inject
 
 data class TextBlockCorrectionReviewResult(
@@ -23,10 +22,9 @@ data class TextBlockCorrectionReviewResult(
 )
 
 class TextBlockCorrectionReview @Inject constructor(
-    private val messageRepo: MessageRepository
+    private val messageRepo: MessageRepository,
+    private val correctionStore: CorrectionStore
 ) {
-
-    private val correctionStore: CorrectionStore = InMemoryCorrectionStore()
 
     fun record(action: CorrectionAction, threadIds: Collection<Long>): TextBlockCorrectionReviewResult {
         var saved = 0

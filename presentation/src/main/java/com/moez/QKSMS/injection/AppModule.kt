@@ -93,6 +93,8 @@ import dev.octoshrimpy.quik.repository.SyncRepository
 import dev.octoshrimpy.quik.repository.SyncRepositoryImpl
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.RuleBasedPoliticalClassifier
+import dev.octoshrimpy.quik.textblock.correction.CorrectionStore
+import dev.octoshrimpy.quik.textblock.correction.InMemoryCorrectionStore
 import dev.octoshrimpy.quik.worker.InjectionWorkerFactory
 import javax.inject.Singleton
 
@@ -227,6 +229,10 @@ class AppModule(private var application: Application) {
     fun provideEmojiReactionRepository(repository: EmojiReactionRepositoryImpl): EmojiReactionRepository = repository
 
     // TextBlock
+    @Provides
+    @Singleton
+    fun provideCorrectionStore(): CorrectionStore = InMemoryCorrectionStore()
+
     @Provides
     fun provideInboundMessageClassifier(): InboundMessageClassifier = RuleBasedPoliticalClassifier()
 
