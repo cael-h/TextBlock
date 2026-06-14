@@ -30,11 +30,17 @@ import dev.octoshrimpy.quik.common.util.extensions.makeToast
 import dev.octoshrimpy.quik.interactor.SyncMessages
 import dev.octoshrimpy.quik.manager.BillingManager
 import dev.octoshrimpy.quik.repository.SyncRepository
+import dev.octoshrimpy.quik.textblock.cleanup.TextBlockCleanup
+import dev.octoshrimpy.quik.textblock.cleanup.TextBlockCleanupAction
 import dev.octoshrimpy.quik.util.NightModeManager
 import dev.octoshrimpy.quik.util.Preferences
+import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.rxkotlin.plusAssign
+import io.reactivex.schedulers.Schedulers
 import timber.log.Timber
 import java.util.Calendar
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -47,7 +53,8 @@ class SettingsPresenter @Inject constructor(
     private val navigator: Navigator,
     private val nightModeManager: NightModeManager,
     private val prefs: Preferences,
-    private val syncMessages: SyncMessages
+    private val syncMessages: SyncMessages,
+    private val textBlockCleanup: TextBlockCleanup
 ) : QkPresenter<SettingsView, SettingsState>(SettingsState(
         nightModeId = prefs.nightMode.get()
 )) {
@@ -241,6 +248,8 @@ class SettingsPresenter @Inject constructor(
 
                         R.id.textBlockAllowContacts -> prefs.textBlockAllowContacts.set(!prefs.textBlockAllowContacts.get())
 
+                        R.id.textBlockCleanup -> view.showTextBlockCleanupDialog()
+
                         R.id.sync -> syncMessages.execute(Unit)
 
                         R.id.about -> view.showAbout()
@@ -312,6 +321,82 @@ class SettingsPresenter @Inject constructor(
         view.textBlockFilterModeSelected()
             .autoDisposable(view.scope())
             .subscribe(prefs.textBlockFilterMode::set)
+
+        view.textBlockCleanupSelected()
+            .autoDisposable(view.scope())
+            .subscribe { request -> runTextBlockCleanup(view, request) }
+    }
+
+    private fun runTextBlockCleanup(view: SettingsView, request: TextBlockCleanupDialogRequest) {
+        val params = request.toTextBlockCleanupParams() ?: return
+
+        textBlockCleanup.buildObservable(params)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDisposable(view.scope())
+            .subscribe(
+                { result -> context.makeToast(result.toToastMessage(params.action)) },
+                { error ->
+                    Timber.w(error, "TextBlock cleanup failed")
+                    context.makeToast(R.string.settings_textblock_cleanup_failed)
+                }
+            )
+    }
+
+    private fun TextBlockCleanupDialogRequest.toTextBlockCleanupParams(): TextBlockCleanup.Params? {
+        val daysText = lookbackDaysText.trim()
+        val dateText = sinceDateText.trim()
+        val days = when {
+            daysText.isBlank() -> null
+            else -> daysText.toLongOrNull()
+        }
+
+        if (daysText.isNotBlank() && days == null) {
+            context.makeToast(R.string.settings_textblock_cleanup_invalid_days)
+            return null
+        }
+
+        val sinceMillis = when {
+            dateText.isNotBlank() -> parseTextBlockCleanupDate(dateText) ?: return null
+            days != null && days > 0L -> System.currentTimeMillis() - TimeUnit.DAYS.toMillis(days)
+            else -> 0L
+        }
+
+        return TextBlockCleanup.Params(
+            sinceMillis = sinceMillis,
+            action = action,
+            allowContacts = prefs.textBlockAllowContacts.get(),
+            blockingClient = prefs.blockingManager.get()
+        )
+    }
+
+    private fun parseTextBlockCleanupDate(dateText: String): Long? {
+        return runCatching {
+            val parser = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply {
+                isLenient = false
+            }
+            require(dateText.matches(Regex("\\d{4}-\\d{2}-\\d{2}")))
+            parser.parse(dateText)?.time
+        }
+            .getOrNull()
+            ?: run {
+                context.makeToast(R.string.settings_textblock_cleanup_invalid_date)
+                null
+            }
+    }
+
+    private fun TextBlockCleanup.Result.toToastMessage(action: TextBlockCleanupAction): String {
+        if (matched == 0) {
+            return context.getString(R.string.settings_textblock_cleanup_result_none, scanned)
+        }
+
+        return when (action) {
+            TextBlockCleanupAction.QUARANTINE ->
+                context.getString(R.string.settings_textblock_cleanup_result_quarantine, scanned, quarantined)
+
+            TextBlockCleanupAction.DELETE ->
+                context.getString(R.string.settings_textblock_cleanup_result_delete, scanned, deleted)
+        }
     }
 
 }

@@ -37,7 +37,7 @@ class QkRealmMigration @Inject constructor(
 ) : RealmMigration {
 
     companion object {
-        const val SCHEMA_VERSION: Long = 15
+        const val SCHEMA_VERSION: Long = 16
     }
 
     @SuppressLint("ApplySharedPref")
@@ -298,6 +298,17 @@ class QkRealmMigration @Inject constructor(
             }
 
             version ++
+        }
+
+        if (version == 15L) {
+            realm.schema.create("TextBlockCorrection")
+                .addField("id", String::class.java, FieldAttribute.PRIMARY_KEY, FieldAttribute.REQUIRED)
+                .addField("action", String::class.java, FieldAttribute.REQUIRED, FieldAttribute.INDEXED)
+                .addField("keyType", String::class.java, FieldAttribute.REQUIRED, FieldAttribute.INDEXED)
+                .addField("keySha256", String::class.java, FieldAttribute.REQUIRED, FieldAttribute.INDEXED)
+                .addField("createdAtMillis", Long::class.java, FieldAttribute.REQUIRED)
+
+            version++
         }
 
         check(version >= SCHEMA_VERSION) {

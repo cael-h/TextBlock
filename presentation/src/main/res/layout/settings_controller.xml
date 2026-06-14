@@ -145,6 +145,14 @@
             app:title="@string/settings_textblock_allow_contacts_title"
             app:widget="@layout/settings_switch_widget" />
 
+        <dev.octoshrimpy.quik.common.widget.PreferenceView
+            android:id="@+id/textBlockCleanup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/delete_sweep"
+            app:summary="@string/settings_textblock_cleanup_summary"
+            app:title="@string/settings_textblock_cleanup_title" />
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"

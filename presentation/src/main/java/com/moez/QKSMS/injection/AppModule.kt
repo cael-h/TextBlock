@@ -95,7 +95,7 @@ import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.RuleBasedPoliticalClassifier
 import dev.octoshrimpy.quik.textblock.correction.CorrectionAwareInboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.correction.CorrectionStore
-import dev.octoshrimpy.quik.textblock.correction.InMemoryCorrectionStore
+import dev.octoshrimpy.quik.textblock.correction.RealmCorrectionStore
 import dev.octoshrimpy.quik.worker.InjectionWorkerFactory
 import javax.inject.Singleton
 
@@ -232,7 +232,7 @@ class AppModule(private var application: Application) {
     // TextBlock
     @Provides
     @Singleton
-    fun provideCorrectionStore(): CorrectionStore = InMemoryCorrectionStore()
+    fun provideCorrectionStore(store: RealmCorrectionStore): CorrectionStore = store
 
     @Provides
     fun provideInboundMessageClassifier(correctionStore: CorrectionStore): InboundMessageClassifier {

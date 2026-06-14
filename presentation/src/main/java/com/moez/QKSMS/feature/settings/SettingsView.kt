@@ -35,6 +35,7 @@ interface SettingsView : QkViewContract<SettingsState> {
     fun mmsSizeSelected(): Observable<Int>
     fun messageLinkHandlingSelected(): Observable<Int>
     fun textBlockFilterModeSelected(): Observable<Int>
+    fun textBlockCleanupSelected(): Observable<TextBlockCleanupDialogRequest>
 
     fun showQksmsPlusSnackbar()
     fun showNightModeDialog()
@@ -46,6 +47,7 @@ interface SettingsView : QkViewContract<SettingsState> {
     fun showMmsSizePicker()
     fun showMessageLinkHandlingDialogPicker()
     fun showTextBlockFilterModeDialog()
+    fun showTextBlockCleanupDialog()
     fun showSwipeActions()
     fun showThemePicker()
     fun showAbout()

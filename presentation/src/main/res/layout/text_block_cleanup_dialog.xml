@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <dev.octoshrimpy.quik.common.widget.QkTextView
+        style="@style/TextSecondary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings_textblock_cleanup_dialog_message" />
+
+    <RadioGroup
+        android:id="@+id/actionGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical">
+
+        <androidx.appcompat.widget.AppCompatRadioButton
+            android:id="@+id/quarantineMatches"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="@string/settings_textblock_cleanup_action_quarantine" />
+
+        <androidx.appcompat.widget.AppCompatRadioButton
+            android:id="@+id/deleteMatches"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/settings_textblock_cleanup_action_delete" />
+    </RadioGroup>
+
+    <dev.octoshrimpy.quik.common.widget.QkEditText
+        android:id="@+id/lookbackDays"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/settings_textblock_cleanup_days_hint"
+        android:inputType="number"
+        android:lines="1"
+        android:maxLength="5"
+        android:singleLine="true"
+        android:textStyle="bold"
+        app:textSize="dialog" />
+
+    <dev.octoshrimpy.quik.common.widget.QkEditText
+        android:id="@+id/sinceDate"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:hint="@string/settings_textblock_cleanup_date_hint"
+        android:inputType="date"
+        android:lines="1"
+        android:maxLength="10"
+        android:singleLine="true"
+        android:textStyle="bold"
+        app:textSize="dialog" />
+</LinearLayout>

@@ -73,6 +73,10 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
 
     @Inject override lateinit var presenter: SettingsPresenter
 
+    private val textBlockCleanupDialog: TextBlockCleanupDialog by lazy {
+        TextBlockCleanupDialog(activity!!, textBlockCleanupSubject::onNext)
+    }
+
     private val signatureDialog: TextInputDialog by lazy {
         TextInputDialog(activity!!, context.getString(R.string.settings_signature_title), signatureSubject::onNext)
     }
@@ -81,6 +85,7 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
     private val startTimeSelectedSubject: Subject<Pair<Int, Int>> = PublishSubject.create()
     private val endTimeSelectedSubject: Subject<Pair<Int, Int>> = PublishSubject.create()
     private val signatureSubject: Subject<String> = PublishSubject.create()
+    private val textBlockCleanupSubject: Subject<TextBlockCleanupDialogRequest> = PublishSubject.create()
 
     private val progressAnimator by lazy { ObjectAnimator.ofInt(binding.syncingProgress, "progress", 0, 0) }
 
@@ -145,6 +150,8 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
     override fun messageLinkHandlingSelected(): Observable<Int> = messageLinkHandlingDialog.adapter.menuItemClicks
 
     override fun textBlockFilterModeSelected(): Observable<Int> = textBlockFilterModeDialog.adapter.menuItemClicks
+
+    override fun textBlockCleanupSelected(): Observable<TextBlockCleanupDialogRequest> = textBlockCleanupSubject
 
     override fun render(state: SettingsState) {
         binding.theme.findViewById<View>(R.id.themePreview)?.setBackgroundTint(state.theme)
@@ -252,6 +259,8 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
     override fun showMessageLinkHandlingDialogPicker() = messageLinkHandlingDialog.show(activity!!)
 
     override fun showTextBlockFilterModeDialog() = textBlockFilterModeDialog.show(activity!!)
+
+    override fun showTextBlockCleanupDialog() = textBlockCleanupDialog.reset().show()
 
     override fun showSwipeActions() {
         router.pushController(RouterTransaction.with(SwipeActionsController())

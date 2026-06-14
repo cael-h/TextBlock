@@ -22,6 +22,7 @@ import android.net.Uri
 import dev.octoshrimpy.quik.model.Attachment
 import dev.octoshrimpy.quik.model.Message
 import dev.octoshrimpy.quik.model.MmsPart
+import dev.octoshrimpy.quik.textblock.cleanup.TextBlockCleanupCandidate
 import io.reactivex.Flowable
 import io.reactivex.Observable
 import io.realm.RealmResults
@@ -96,6 +97,8 @@ interface MessageRepository {
     fun cancelDelayedSmsAlarm(messageId: Long)
 
     fun insertReceivedSms(subId: Int, address: String, body: String, sentTime: Long): Message
+
+    fun getTextBlockCleanupCandidates(sinceMillis: Long): List<TextBlockCleanupCandidate>
 
     fun deleteMessages(messageIds: Collection<Long>)
 

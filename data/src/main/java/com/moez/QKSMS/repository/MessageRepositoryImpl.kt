@@ -59,6 +59,7 @@ import dev.octoshrimpy.quik.receiver.MessageDeliveredReceiver
 import dev.octoshrimpy.quik.receiver.MessageSentReceiver
 import dev.octoshrimpy.quik.receiver.SendDelayedMessageReceiver
 import dev.octoshrimpy.quik.receiver.SendDelayedMessageReceiver.Companion.MESSAGE_ID_EXTRA
+import dev.octoshrimpy.quik.textblock.cleanup.TextBlockCleanupCandidate
 import dev.octoshrimpy.quik.util.ImageUtils
 import dev.octoshrimpy.quik.util.PhoneNumberUtils
 import dev.octoshrimpy.quik.util.Preferences
@@ -767,6 +768,43 @@ open class MessageRepositoryImpl @Inject constructor(
 
         return message
     }
+
+    override fun getTextBlockCleanupCandidates(sinceMillis: Long): List<TextBlockCleanupCandidate> =
+        Realm.getDefaultInstance().use { realm ->
+            realm.refresh()
+
+            realm.where(Message::class.java)
+                .greaterThanOrEqualTo("date", sinceMillis)
+                .equalTo("isEmojiReaction", false)
+                .beginGroup()
+                .beginGroup()
+                .equalTo("type", TYPE_SMS)
+                .`in`("boxId", arrayOf(Sms.MESSAGE_TYPE_INBOX, Sms.MESSAGE_TYPE_ALL))
+                .endGroup()
+                .or()
+                .beginGroup()
+                .equalTo("type", TYPE_MMS)
+                .`in`("boxId", arrayOf(Mms.MESSAGE_BOX_INBOX, Mms.MESSAGE_BOX_ALL))
+                .endGroup()
+                .endGroup()
+                .sort("date", Sort.DESCENDING)
+                .findAll()
+                .mapNotNull { message ->
+                    message
+                        .takeIf { it.hasNonWhitespaceText() }
+                        ?.let {
+                            TextBlockCleanupCandidate(
+                                messageId = it.id,
+                                threadId = it.threadId,
+                                address = it.address,
+                                body = it.getText(),
+                                timestampMillis = it.date,
+                                isMms = it.isMms(),
+                                subscriptionId = it.subId
+                            )
+                        }
+                }
+        }
 
     override fun markAsSendingNow(messageId: Long) =
         Realm.getDefaultInstance().use { realm ->

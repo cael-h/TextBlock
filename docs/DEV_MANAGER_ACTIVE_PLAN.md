@@ -636,12 +636,51 @@ Merge result:
 - Install on an attached Android phone or emulator and validate default-SMS,
   inbound SMS, inbound MMS ACK/notify, quarantine review, "Not spam", and "Block
   similar" flows end to end.
-- Replace the current in-memory `CorrectionStore` with durable local storage so
-  corrections survive process death and app restart.
 - Add worker-level or instrumented tests for SMS/MMS repository side effects and
   carrier ACK/notify behavior.
 - Decide whether "Not spam" should also unblock/restore the current quarantined
   conversation or only affect future classification.
+
+## Batch 4 Manual Cleanup And Durable Corrections
+
+Purpose:
+
+- Make TextBlock correction learning survive app/process restarts.
+- Give the user a manual cleanup tool that scans already-synced inbound texts
+  with the current TextBlock rules and either quarantines or deletes matches.
+
+Implementation:
+
+- Added `TextBlockCorrection` Realm storage and bumped Realm schema to 16.
+- Replaced the production `CorrectionStore` binding with `RealmCorrectionStore`;
+  the in-memory store remains for unit tests.
+- Added `TextBlockCleanup` with a testable cleanup planner and a repository DTO
+  so old SMS/MMS scans do not pass Realm-managed `Message` objects across layers.
+- Added `MessageRepository.getTextBlockCleanupCandidates(sinceMillis)` for
+  inbound SMS/MMS text scans.
+- Added Settings > TextBlock > Clean up matching texts. The dialog supports:
+  - quarantine or delete
+  - last N days
+  - absolute start date in `YYYY-MM-DD`
+  - blank days/date for all synced inbound text messages
+
+Verification:
+
+- `./gradlew :domain:testDebugUnitTest --tests dev.octoshrimpy.quik.textblock.cleanup.TextBlockCleanupPlannerTest` passed.
+- Initial `:presentation:assembleDebug` without the Termux `aapt2` override
+  failed before compilation because Gradle attempted to run the Maven Linux
+  `aapt2` binary in Termux.
+- `ANDROID_HOME=/data/data/com.termux/files/home/android-sdk-termux ./gradlew --no-daemon :presentation:assembleDebug -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2` passed and produced
+  `presentation/build/outputs/apk/debug/TextBlock-v4.3.6-debug.apk`.
+
+Residual risk:
+
+- Manual phone/emulator testing is still needed for Settings UI behavior,
+  Realm migration on an existing install, and actual SMS provider delete/read
+  side effects.
+- The cleanup tool currently applies the same contact allowlist setting used by
+  live filtering. It forces filtering on for manual scans so disabled live
+  filtering does not prevent an intentional cleanup run.
 
 ## Completion Criteria For This Milestone
 
