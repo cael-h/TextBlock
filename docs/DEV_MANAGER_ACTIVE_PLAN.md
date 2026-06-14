@@ -682,6 +682,49 @@ Residual risk:
   live filtering. It forces filtering on for manual scans so disabled live
   filtering does not prevent an intentional cleanup run.
 
+## Batch 5 Release Build
+
+Purpose:
+
+- Produce an installable signed release APK for local phone testing/use.
+- Establish release signing material so future release builds are reproducible.
+
+Signing setup:
+
+- Generated a new local release keystore at
+  `presentation/my-release-key.keystore`.
+- Generated local ignored Gradle signing properties at `.gradle/.gradlerc` and
+  `presentation/.gradle/.gradlerc`.
+- Stored the signing material as GitHub Actions secrets so future release
+  workflows are not dependent on this phone alone:
+  - `ANDROID_KEYSTORE_BASE64`
+  - `ANDROID_KEYSTORE_PASSWORD`
+  - `ANDROID_KEY_ALIAS`
+  - `ANDROID_KEY_PASSWORD`
+- Do not commit keystore or signing property files; they are intentionally
+  ignored.
+
+Verification:
+
+- Initial `:presentation:assembleRelease` failed because release signing files
+  were not present.
+- After signing setup,
+  `ANDROID_HOME=/data/data/com.termux/files/home/android-sdk-termux ./gradlew --no-daemon :presentation:assembleRelease -Pandroid.aapt2FromMavenOverride=/data/data/com.termux/files/usr/bin/aapt2`
+  passed.
+- Release APK produced:
+  `presentation/build/outputs/apk/release/TextBlock-v4.3.6-release.apk`.
+- Copied APK to:
+  `/data/data/com.termux/files/home/termux_share/TextBlock-v4.3.6-release.apk`.
+- SHA-256:
+  `5bb74fab6593e7206ed63f50162af55ae29862bd0622269fda6513b3965dfa92`.
+- `apksigner verify presentation/build/outputs/apk/release/TextBlock-v4.3.6-release.apk`
+  passed. It prints standard warnings about unsigned `META-INF` metadata entries.
+
+Install note:
+
+- The debug build uses application id `com.caelh.textblock.debug`; the release
+  build uses `com.caelh.textblock`. Android will treat them as separate apps.
+
 ## Completion Criteria For This Milestone
 
 - [x] Build readiness documented and improved where possible.
