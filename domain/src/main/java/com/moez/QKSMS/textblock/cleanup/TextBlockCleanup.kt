@@ -21,6 +21,7 @@ import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
 import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
 import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
+import dev.octoshrimpy.quik.textblock.toTextBlockBlockReason
 import io.reactivex.Flowable
 import javax.inject.Inject
 
@@ -119,7 +120,7 @@ class TextBlockCleanup @Inject constructor(
                 conversationRepo.markBlocked(
                     listOf(threadId),
                     blockingClient,
-                    threadMatches.first().classificationResult.toBlockReason()
+                    threadMatches.first().classificationResult.toTextBlockBlockReason()
                 )
             }
     }
@@ -134,15 +135,6 @@ class TextBlockCleanup @Inject constructor(
         conversationRepo.updateConversations(threadIds)
     }
 
-    private fun ClassificationResult.toBlockReason(): String {
-        return buildString {
-            append("TextBlock ")
-            append(category.name)
-            append(" confidence=")
-            append(confidence)
-            reason?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
-        }
-    }
 }
 
 enum class TextBlockCleanupAction {

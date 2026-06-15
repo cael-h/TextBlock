@@ -22,12 +22,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony.Sms
+import android.telephony.SmsMessage
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dagger.android.AndroidInjection
+import dev.octoshrimpy.quik.repository.ContactRepository
+import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
+import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
+import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
+import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
+import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
+import dev.octoshrimpy.quik.textblock.toTextBlockBlockReason
+import dev.octoshrimpy.quik.util.Preferences
 import dev.octoshrimpy.quik.worker.ReceiveSmsWorker
 import dev.octoshrimpy.quik.worker.ReceiveSmsWorker.Companion.INPUT_DATA_KEY_MESSAGE_ID
 import io.reactivex.Single
@@ -37,6 +46,10 @@ import javax.inject.Inject
 
 class SmsReceivedReceiver : BroadcastReceiver() {
     @Inject lateinit var messageRepo: MessageRepository
+    @Inject lateinit var conversationRepo: ConversationRepository
+    @Inject lateinit var contactsRepo: ContactRepository
+    @Inject lateinit var prefs: Preferences
+    @Inject lateinit var inboundMessageClassifier: InboundMessageClassifier
 
     override fun onReceive(context: Context, intent: Intent) {
         AndroidInjection.inject(this, context)
@@ -46,23 +59,18 @@ class SmsReceivedReceiver : BroadcastReceiver() {
             // reduce list of messages to single message and save in db
             Single.just(messages)
                 .observeOn(Schedulers.io())
-                .map {
-                    Timber.v("onReceive() new sms")  // here so runs on io thread
-
-                    messageRepo.insertReceivedSms(
-                        intent.extras?.getInt("subscription", -1) ?: -1,
-                        messages[0].displayOriginatingAddress,
-                        messages.mapNotNull { it.displayMessageBody }.reduce { body, new -> body + new },
-                        messages[0].timestampMillis
-                    ).id
+                .map { smsMessages ->
+                    persistAndMaybeFilterSms(intent, smsMessages)
                 }
-                .subscribe({ messageId ->
-                    WorkManager.getInstance(context).enqueue(
-                        OneTimeWorkRequestBuilder<ReceiveSmsWorker>()
-                            .setInputData(workDataOf(INPUT_DATA_KEY_MESSAGE_ID to messageId))
-                            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
-                            .build()
-                    )
+                .subscribe({ result ->
+                    result.workerMessageId?.let { messageId ->
+                        WorkManager.getInstance(context).enqueue(
+                            OneTimeWorkRequestBuilder<ReceiveSmsWorker>()
+                                .setInputData(workDataOf(INPUT_DATA_KEY_MESSAGE_ID to messageId))
+                                .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+                                .build()
+                        )
+                    }
                     pendingResult.finish()
                 }, { error ->
                     Timber.e(error, "error receiving new sms")
@@ -70,5 +78,74 @@ class SmsReceivedReceiver : BroadcastReceiver() {
                 })
         }
     }
+
+    private fun persistAndMaybeFilterSms(
+        intent: Intent,
+        messages: Array<SmsMessage>
+    ): ReceiveSmsResult {
+        Timber.v("onReceive() new sms")  // here so runs on io thread
+
+        val subscriptionId = intent.extras?.getInt("subscription", -1) ?: -1
+        val address = messages[0].displayOriginatingAddress
+        val body = messages.mapNotNull { it.displayMessageBody }.joinToString(separator = "")
+        val sentTime = messages[0].timestampMillis
+        val message = messageRepo.insertReceivedSms(subscriptionId, address, body, sentTime)
+
+        return try {
+            val senderIsContact = contactsRepo.isContact(address)
+            val textBlockDecision = TextBlockReceivePolicy.evaluate(
+                filteringEnabled = prefs.textBlockFiltering.get(),
+                allowContacts = prefs.textBlockAllowContacts.get(),
+                isFromContact = senderIsContact,
+                dropMode = isTextBlockDropMode()
+            ) { isFromContactForClassifier ->
+                inboundMessageClassifier.classify(
+                    InboundMessageForClassification(
+                        address = address,
+                        body = body,
+                        timestampMillis = sentTime,
+                        isMms = false,
+                        isFromContact = isFromContactForClassifier,
+                        subscriptionId = subscriptionId
+                    )
+                )
+            }
+
+            when (textBlockDecision.effect) {
+                TextBlockReceiveEffect.ALLOW -> ReceiveSmsResult(workerMessageId = message.id)
+
+                TextBlockReceiveEffect.QUARANTINE -> {
+                    val textBlockResult = textBlockDecision.requireClassificationResult()
+                    Timber.v("TextBlock quarantined SMS before worker as ${textBlockResult.action}")
+                    conversationRepo.updateConversations(listOf(message.threadId))
+                    messageRepo.markRead(listOf(message.threadId))
+                    conversationRepo.markBlocked(
+                        listOf(message.threadId),
+                        prefs.blockingManager.get(),
+                        textBlockResult.toTextBlockBlockReason()
+                    )
+                    ReceiveSmsResult()
+                }
+
+                TextBlockReceiveEffect.DROP -> {
+                    val textBlockResult = textBlockDecision.requireClassificationResult()
+                    Timber.v("TextBlock dropped SMS before worker as ${textBlockResult.action}")
+                    messageRepo.deleteMessages(listOf(message.id))
+                    ReceiveSmsResult()
+                }
+            }
+        } catch (error: Exception) {
+            Timber.e(error, "TextBlock pre-worker SMS filter failed")
+            ReceiveSmsResult(workerMessageId = message.id)
+        }
+    }
+
+    private fun isTextBlockDropMode(): Boolean {
+        return prefs.textBlockFilterMode.get() == Preferences.TEXTBLOCK_FILTER_MODE_DROP
+    }
+
+    private data class ReceiveSmsResult(
+        val workerMessageId: Long? = null
+    )
 
 }

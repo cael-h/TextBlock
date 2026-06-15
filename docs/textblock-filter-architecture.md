@@ -31,9 +31,11 @@ Primary behavior:
 QUIK already has the right receive path for this:
 
 - `data/src/main/java/com/moez/QKSMS/receiver/SmsReceivedReceiver.kt`
-  receives `SMS_DELIVER` and persists the inbound SMS.
+  receives `SMS_DELIVER`, persists the inbound SMS, and can apply the
+  TextBlock receive policy before enqueueing SMS worker work.
 - `data/src/main/java/com/moez/QKSMS/worker/ReceiveSmsWorker.kt`
-  evaluates blocked senders and content filters before notification.
+  evaluates blocked senders, content filters, and the TextBlock receive policy
+  before notification as a fallback for allowed/pre-filter-failed SMS.
 - `data/src/main/java/com/moez/QKSMS/receiver/MmsReceivedReceiver.kt`
   hands downloaded MMS work to a worker.
 - `data/src/main/java/com/moez/QKSMS/worker/ReceiveMmsWorker.kt`
@@ -84,8 +86,12 @@ Suggested categories:
 - `SCAM`
 - `UNKNOWN`
 
-The receive workers should call this classifier after existing sender-blocking
-checks and before notification creation.
+The SMS receiver should call this classifier before starting WorkManager when it
+has the full SMS body, so filtered SMS does not trigger Android's expedited
+worker foreground notification. Receive workers still call the classifier before
+normal notification creation as a fallback and for MMS, where the message must be
+downloaded first. Notification creation must also refuse blocked/quarantined
+conversations.
 
 ## First Implementation Pass
 

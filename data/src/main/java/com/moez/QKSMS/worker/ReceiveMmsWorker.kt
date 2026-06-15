@@ -61,6 +61,7 @@ import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
 import dev.octoshrimpy.quik.textblock.TextBlockMmsPostPersistencePlan
 import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
 import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
+import dev.octoshrimpy.quik.textblock.toTextBlockBlockReason
 import dev.octoshrimpy.quik.util.Preferences
 import timber.log.Timber
 import java.io.File
@@ -235,7 +236,7 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                                         conversationRepo.markBlocked(
                                             listOf(message.threadId),
                                             prefs.blockingManager.get(),
-                                            textBlockResult.toBlockReason()
+                                            textBlockResult.toTextBlockBlockReason()
                                         )
                                     }
 
@@ -321,16 +322,6 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
 
     private fun isTextBlockDropMode(): Boolean {
         return prefs.textBlockFilterMode.get() == Preferences.TEXTBLOCK_FILTER_MODE_DROP
-    }
-
-    private fun ClassificationResult.toBlockReason(): String {
-        return buildString {
-            append("TextBlock ")
-            append(category.name)
-            append(" confidence=")
-            append(confidence)
-            reason?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
-        }
     }
 
     private fun handleHttpError(context: Context, mmsHttpStatus: Int, locationUrl: String) {

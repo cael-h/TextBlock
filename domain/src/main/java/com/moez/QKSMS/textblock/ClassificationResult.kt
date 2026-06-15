@@ -38,3 +38,13 @@ enum class FilterCategory {
     SCAM,
     UNKNOWN
 }
+
+fun ClassificationResult.toTextBlockBlockReason(): String {
+    return buildString {
+        append("TextBlock ")
+        append(category.name)
+        append(" confidence=")
+        append(confidence)
+        reason?.takeIf { it.isNotBlank() }?.let { append(": ").append(it) }
+    }
+}
