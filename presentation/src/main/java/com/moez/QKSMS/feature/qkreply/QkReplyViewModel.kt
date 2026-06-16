@@ -34,6 +34,7 @@ import dev.octoshrimpy.quik.model.Message
 import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.util.ActiveSubscriptionObservable
+import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.rxkotlin.Observables
 import io.reactivex.rxkotlin.plusAssign
 import io.reactivex.rxkotlin.withLatestFrom
@@ -41,6 +42,7 @@ import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.Subject
 import io.realm.RealmResults
+import timber.log.Timber
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Named
@@ -215,11 +217,19 @@ class QkReplyViewModel @Inject constructor(
                 .withLatestFrom(view.textChangedIntent) { _, body -> body }
                 .map { body -> body.toString() }
                 .withLatestFrom(state, conversation) { body, state, conversation ->
-                    sendNewMessage.execute(SendNewMessage.Params(
+                    val params = SendNewMessage.Params(
                         state.subscription?.subscriptionId ?: -1, 0,
                         conversation.recipients.map { it.address }, body, conversation.sendAsGroup
-                    ))
-                    view.setDraft("")
+                    )
+
+                    disposables += sendNewMessage.buildObservable(params)
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe({ result ->
+                            if (result.created) {
+                                view.setDraft("")
+                            }
+                        }, Timber::w)
                 }
                 .doOnNext {
                     markRead.execute(listOf(threadId)) { newState { copy(hasError = true) } }

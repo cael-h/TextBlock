@@ -19,7 +19,6 @@
 package dev.octoshrimpy.quik.interactor
 
 import dev.octoshrimpy.quik.manager.ShortcutManager
-import dev.octoshrimpy.quik.extensions.mapNotNull
 import dev.octoshrimpy.quik.model.Attachment
 import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
@@ -45,12 +44,17 @@ class SendNewMessage @Inject constructor(
         val delay: Int = 0
     )
 
-    override fun buildObservable(params: Params): Flowable<*> = Flowable.just(Unit)
-        .mapNotNull {
+    data class Result(
+        val threadIds: List<Long>
+    ) {
+        val created: Boolean = threadIds.isNotEmpty()
+    }
+
+    override fun buildObservable(params: Params): Flowable<Result> = Flowable.fromCallable {
             // if addresses are provided, prefer them over the thread id because from a user
             // perspective it is more important that the intended recipients are messaged rather
             // than that messages go to a thread id
-            when {
+            val conversation = when {
                 params.addresses.isNotEmpty() ->
                     conversationRepo.getOrCreateConversation(params.addresses)
 
@@ -59,26 +63,44 @@ class SendNewMessage @Inject constructor(
 
                 else -> null
             }
-            ?:let { Timber.e("unable to get or create a conversation record"); null }
+
+            if (conversation == null) {
+                Timber.e("unable to get or create a conversation record")
+                Result(emptyList())
+            } else {
+                val messages = messageRepo.sendNewMessages(
+                    params.subId,
+                    conversation.recipients.map { it.address },
+                    params.body,
+                    params.attachments,
+                    params.sendAsGroup,
+                    params.delay
+                )
+
+                Result(messages.map { it.threadId })
+            }
         }
-        .map { conversation ->
-            // send the message
-            messageRepo.sendNewMessages(params.subId, conversation.recipients.map { it.address },
-                params.body, params.attachments, params.sendAsGroup, params.delay)
-        }
-        .map { messages -> messages.map { it.threadId } }
-        .doOnNext { threadIds ->
-            conversationRepo.updateConversations(threadIds)
-            conversationRepo.markUnarchived(threadIds)
+        .doOnNext { result ->
+            if (!result.created) {
+                Timber.w("send did not create any message records")
+                return@doOnNext
+            }
+
+            conversationRepo.updateConversations(result.threadIds)
+            conversationRepo.markUnarchived(result.threadIds)
 
             AndroidSchedulers.mainThread().scheduleDirect {
-                threadIds.forEach { shortcutManager.getOrCreateShortcut(it) }
+                result.threadIds.forEach { shortcutManager.getOrCreateShortcut(it) }
             }
 
             // delete attachment local files, if any, because they're saved to mms db by now
             params.attachments.forEach { it.removeCacheFile() }
         }
         .observeOn(AndroidSchedulers.mainThread())
-        .flatMap { updateBadge.buildObservable(Unit) } // Update the widget
+        .flatMap { result ->
+            updateBadge.buildObservable(Unit)
+                .map { result }
+                .defaultIfEmpty(result)
+        } // Update the widget
 
 }

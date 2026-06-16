@@ -66,13 +66,14 @@
     <color name="tools_theme">#00838F</color>
 
     <array name="random_colors">
-        <item>#06C9AF</item>
-        <item>#6DC966</item>
-        <item>#F1AF28</item>
-        <item>#FF8963</item>
-        <item>#FF6969</item>
-        <item>#5D99FF</item>
-        <item>#8899EC</item>
+        <item>#8E44AD</item> <!-- purple -->
+        <item>#4F46E5</item> <!-- indigo -->
+        <item>#EC4899</item> <!-- pink -->
+        <item>#009688</item> <!-- teal -->
+        <item>#FF6B6B</item> <!-- coral -->
+        <item>#2E8B57</item> <!-- sea green -->
+        <item>#3EB489</item> <!-- mint -->
+        <item>#00AFC1</item> <!-- robin's egg blue -->
     </array>
 
     <array name="material_red">

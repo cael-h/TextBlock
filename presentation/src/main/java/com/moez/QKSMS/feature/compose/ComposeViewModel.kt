@@ -1224,6 +1224,7 @@ class ComposeViewModel @Inject constructor(
                     ).also {
                         newState { copy(scheduled = 0) }
                         showScheduledToast = true
+                        view.clearCurrentMessageIntent.onNext(false)
                     }
 
                         scheduled = true
@@ -1231,15 +1232,32 @@ class ComposeViewModel @Inject constructor(
 
                     // send message
                     else -> {
-                        sendNewMessage.execute(
-                            SendNewMessage.Params(subId, 0, addresses, body.toString(),
-                                sendAsGroup, state.attachments.toList(), delay)
+                        val params = SendNewMessage.Params(
+                            subId,
+                            0,
+                            addresses,
+                            body.toString(),
+                            sendAsGroup,
+                            state.attachments.toList(),
+                            delay
                         )
+
+                        disposables += sendNewMessage.buildObservable(params)
+                            .subscribeOn(Schedulers.io())
+                            .observeOn(AndroidSchedulers.mainThread())
+                            .subscribe({ result ->
+                                if (result.created) {
+                                    view.clearCurrentMessageIntent.onNext(false)
+                                    view.focusMessage()
+                                } else {
+                                    context.makeToast(R.string.compose_send_failed_toast)
+                                }
+                            }, { error ->
+                                Timber.w(error, "send failed")
+                                context.makeToast(R.string.compose_send_failed_toast)
+                            })
                     }
                 }
-
-                // clear the current message ready for new message composition
-                view.clearCurrentMessageIntent.onNext(false)
 
                 scheduled
             }
