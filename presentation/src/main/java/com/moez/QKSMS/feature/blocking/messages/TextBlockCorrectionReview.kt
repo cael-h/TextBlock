@@ -11,6 +11,7 @@
 package dev.octoshrimpy.quik.feature.blocking.messages
 
 import dev.octoshrimpy.quik.repository.MessageRepository
+import dev.octoshrimpy.quik.model.Message
 import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import dev.octoshrimpy.quik.textblock.correction.CorrectionSignals
 import dev.octoshrimpy.quik.textblock.correction.CorrectionStore
@@ -27,15 +28,61 @@ class TextBlockCorrectionReview @Inject constructor(
 ) {
 
     fun record(action: CorrectionAction, threadIds: Collection<Long>): TextBlockCorrectionReviewResult {
-        var saved = 0
+        val messages = mutableListOf<Message>()
         var skipped = 0
 
         threadIds.forEach { threadId ->
             val message = messageRepo.getLastIncomingMessage(threadId)
                 .firstOrNull { it.hasNonWhitespaceText() }
 
-            val body = message?.getText()?.takeIf { it.isNotBlank() }
-            if (message == null || body == null) {
+            if (message == null) {
+                skipped += 1
+            } else {
+                messages += message
+            }
+        }
+
+        return recordMessages(
+            action,
+            messages,
+            skipped
+        )
+    }
+
+    fun recordSelectedMessages(
+        action: CorrectionAction,
+        messageIds: Collection<Long>
+    ): TextBlockCorrectionReviewResult {
+        val messages = mutableListOf<Message>()
+        var skipped = 0
+
+        messageIds.forEach { messageId ->
+            val message = messageRepo.getMessage(messageId)
+            if (message == null) {
+                skipped += 1
+            } else {
+                messages += message
+            }
+        }
+
+        return recordMessages(
+            action,
+            messages,
+            skipped
+        )
+    }
+
+    private fun recordMessages(
+        action: CorrectionAction,
+        messages: Collection<Message>,
+        initialSkipped: Int = 0
+    ): TextBlockCorrectionReviewResult {
+        var saved = 0
+        var skipped = initialSkipped
+
+        messages.forEach { message ->
+            val body = message.getText().takeIf { it.isNotBlank() }
+            if (body == null) {
                 skipped += 1
             } else {
                 correctionStore.save(

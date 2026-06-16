@@ -151,6 +151,7 @@
     <string name="compose_no_valid_recipients">Can\'t send to other participants</string>
     <string name="compose_menu_copy">Copy text</string>
     <string name="compose_menu_share">Share text</string>
+    <string name="compose_menu_textblock_block_similar">Block similar text</string>
     <string name="compose_menu_forward">Forward</string>
     <string name="compose_menu_show_status">Show status</string>
     <string name="compose_menu_delete">Delete</string>
@@ -413,7 +414,12 @@
         <item quantity="one">Saved Block similar for %d conversation</item>
         <item quantity="other">Saved Block similar for %d conversations</item>
     </plurals>
+    <plurals name="textblock_correction_block_similar_messages_saved">
+        <item quantity="one">Saved Block similar for %d message</item>
+        <item quantity="other">Saved Block similar for %d messages</item>
+    </plurals>
     <string name="textblock_correction_no_text">No local message text available for TextBlock correction</string>
+    <string name="textblock_correction_save_failed">Could not save TextBlock correction</string>
 
     <string name="blocking_block_title">Block</string>
     <string name="blocking_unblock_title">Unblock</string>

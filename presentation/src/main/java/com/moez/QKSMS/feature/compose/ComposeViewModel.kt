@@ -53,6 +53,8 @@ import dev.octoshrimpy.quik.extensions.isSmil
 import dev.octoshrimpy.quik.extensions.isText
 import dev.octoshrimpy.quik.extensions.isVideo
 import dev.octoshrimpy.quik.extensions.mapNotNull
+import dev.octoshrimpy.quik.feature.blocking.messages.TextBlockCorrectionReview
+import dev.octoshrimpy.quik.feature.blocking.messages.TextBlockCorrectionReviewResult
 import dev.octoshrimpy.quik.interactor.ActionDelayedMessage
 import dev.octoshrimpy.quik.interactor.AddScheduledMessage
 import dev.octoshrimpy.quik.interactor.DeleteMessages
@@ -73,6 +75,7 @@ import dev.octoshrimpy.quik.repository.ContactRepository
 import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.repository.ScheduledMessageRepository
+import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import dev.octoshrimpy.quik.util.ActiveSubscriptionObservable
 import dev.octoshrimpy.quik.util.FileUtils
 import dev.octoshrimpy.quik.util.PhoneNumberUtils
@@ -127,6 +130,7 @@ class ComposeViewModel @Inject constructor(
     private val sendNewMessage: SendNewMessage,
     private val subscriptionManager: SubscriptionManagerCompat,
     private val saveImage: SaveImage,
+    private val textBlockCorrectionReview: TextBlockCorrectionReview,
 ) : QkViewModel<ComposeView, ComposeState>(ComposeState(
         editingMode = threadId == 0L && addresses.isEmpty(),
         threadId = threadId,
@@ -483,6 +487,29 @@ class ComposeViewModel @Inject constructor(
             }
             .autoDisposable(view.scope())
             .subscribe { view.clearSelection() }
+
+        // Save a local TextBlock correction from selected message text
+        view.optionsItemIntent
+            .filter { it == R.id.textblock_block_similar }
+            .withLatestFrom(view.messagesSelectedIntent) { _, messageIds -> messageIds }
+            .observeOn(Schedulers.io())
+            .map { messageIds ->
+                textBlockCorrectionReview.recordSelectedMessages(
+                    CorrectionAction.BLOCK_SIMILAR,
+                    messageIds
+                )
+            }
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDisposable(view.scope())
+            .subscribe({ result ->
+                showTextBlockCorrectionResult(result)
+                if (result.saved > 0) {
+                    view.clearSelection()
+                }
+            }, { error ->
+                Timber.w(error, "failed to record TextBlock correction")
+                context.makeToast(R.string.textblock_correction_save_failed)
+            })
 
         // Show the message details
         view.optionsItemIntent
@@ -1319,6 +1346,19 @@ class ComposeViewModel @Inject constructor(
             }
             .autoDisposable(view.scope())
             .subscribe()
+    }
+
+    private fun showTextBlockCorrectionResult(result: TextBlockCorrectionReviewResult) {
+        val message = when {
+            result.saved == 0 -> context.getString(R.string.textblock_correction_no_text)
+            else -> context.resources.getQuantityString(
+                R.plurals.textblock_correction_block_similar_messages_saved,
+                result.saved,
+                result.saved
+            )
+        }
+
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
 
 }

@@ -65,6 +65,12 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             matches += "political language"
         }
 
+        val localRaceMatches = localRaceTerms.count { text.containsWordOrPhrase(it) }
+        if (localRaceMatches > 0) {
+            score += localRaceMatches.coerceAtMost(2)
+            matches += "local race language"
+        }
+
         val petitionMatches = petitionTerms.count { text.containsWordOrPhrase(it) }
         if (petitionMatches > 0) {
             score += petitionMatches.coerceAtMost(2)
@@ -138,6 +144,7 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             "got-pac.org",
             "jg4co.org",
             "jp4tn.org",
+            "letsgv.net",
             "mm4ca.org",
             "nl4sc.com",
             "prochoicemaj.com",
@@ -191,6 +198,7 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             "congress",
             "congressional district",
             "democrat",
+            "democratic primary",
             "democratic nominee",
             "democratic secretaries of state",
             "election",
@@ -210,7 +218,16 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             "tossup",
             "vote",
             "voter",
+            "voting",
             "voting rights"
+        )
+
+        val localRaceTerms = listOf(
+            "county council",
+            "district 1",
+            "early voting",
+            "dark money",
+            "opponent"
         )
 
         val petitionTerms = listOf(

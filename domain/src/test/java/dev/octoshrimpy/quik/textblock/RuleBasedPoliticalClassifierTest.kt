@@ -82,6 +82,25 @@ class RuleBasedPoliticalClassifierTest {
     }
 
     @Test
+    fun localCandidatePrimaryMmsQuarantinesAsPolitical() {
+        val result = classify(
+            address = "14108344402",
+            isMms = true,
+            body = """
+                Anonymous, dark money PACs who support one of my opponents are lying about my record.
+                Please stand with me in the Democratic Primary for Howard County Council in District 1 on June 23.
+                Early voting ends on June 18. - Jean Xu
+                Watch the video here: https://go.letsgv.net/UTFV5t6f
+                Stop2End
+            """.trimIndent()
+        )
+
+        assertQuarantined(result, FilterCategory.POLITICAL)
+        assertReasonIncludes(result, "known campaign domain")
+        assertReasonIncludes(result, "local race language")
+    }
+
+    @Test
     fun benignPoliticalConversationFromContactIsAllowedWhenScoreIsLow() {
         val result = classify(
             address = "+15551234567",
