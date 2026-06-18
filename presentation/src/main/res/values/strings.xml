@@ -170,6 +170,8 @@
     <string name="compose_details_received">Received: %s</string>
     <string name="compose_details_delivered">Delivered: %s</string>
     <string name="compose_details_error_code">Error code: %d</string>
+    <string name="compose_reaction_sender_me">Me</string>
+    <string name="compose_reaction_send_failed">Reaction could not be sent. Check that TextBlock is your default SMS app and try again.</string>
     <string name="compose_attach_cd">Add an attachment</string>
     <string name="compose_attach_file_cd">Attach any file</string>
     <string name="compose_gallery_cd">Attach a photo</string>

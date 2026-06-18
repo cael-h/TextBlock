@@ -147,6 +147,28 @@ class EmojiReactionRepositoryImpl @Inject constructor(
         return null
     }
 
+    override fun buildOutgoingReactionBody(emoji: String, originalMessageText: String): String {
+        val quote = originalMessageText
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .let { text ->
+                when {
+                    text.length <= OUTGOING_REACTION_QUOTE_LIMIT -> text
+                    else -> text.take(OUTGOING_REACTION_QUOTE_LIMIT).trimEnd() + "\u2026"
+                }
+            }
+
+        return when (emoji) {
+            "❤️" -> "Loved “$quote”"
+            "👍" -> "Liked “$quote”"
+            "👎" -> "Disliked “$quote”"
+            "😂" -> "Laughed at “$quote”"
+            "‼️" -> "Emphasized “$quote”"
+            "❓" -> "Questioned “$quote”"
+            else -> "Reacted $emoji to “$quote”"
+        }
+    }
+
     private fun parseRemoval(body: String): ParsedEmojiReaction? {
         for ((pattern, parser) in removalPatterns) {
             val match = pattern.find(body) ?: continue
@@ -266,6 +288,34 @@ class EmojiReactionRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun saveOutgoingEmojiReaction(
+        reactionMessage: Message,
+        emoji: String,
+        targetMessage: Message,
+        realm: Realm,
+    ) {
+        val reaction = EmojiReaction().apply {
+            id = keyManager.newId()
+            reactionMessageId = reactionMessage.id
+            senderAddress = EmojiReaction.SENDER_SELF
+            this.emoji = emoji
+            originalMessageText = targetMessage.getText(false)
+            threadId = reactionMessage.threadId
+        }
+        realm.insertOrUpdate(reaction)
+
+        reactionMessage.isEmojiReaction = true
+        realm.insertOrUpdate(reactionMessage)
+
+        val priorFromSelf = targetMessage.emojiReactions
+            .filter { it.senderAddress == EmojiReaction.SENDER_SELF }
+        priorFromSelf.forEach { it.deleteFromRealm() }
+
+        targetMessage.emojiReactions.add(reaction)
+
+        Timber.i("Saved outgoing emoji reaction: $emoji to message ${targetMessage.id}")
+    }
+
     override fun deleteAndReparseAllEmojiReactions(realm: Realm, onProgress: (SyncRepository.SyncProgress) -> Unit) {
         val startTime = System.currentTimeMillis()
 
@@ -325,6 +375,10 @@ class EmojiReactionRepositoryImpl @Inject constructor(
 
         val endTime = System.currentTimeMillis()
         Timber.d("Deleted and reparsed all emoji reactions in ${endTime - startTime}ms")
+    }
+
+    private companion object {
+        const val OUTGOING_REACTION_QUOTE_LIMIT = 140
     }
 
 }

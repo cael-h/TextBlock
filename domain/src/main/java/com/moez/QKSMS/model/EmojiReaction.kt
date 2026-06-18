@@ -23,6 +23,10 @@ import io.realm.annotations.Index
 import io.realm.annotations.PrimaryKey
 
 open class EmojiReaction : RealmObject() {
+    companion object {
+        const val SENDER_SELF = "__textblock_self__"
+    }
+
     @PrimaryKey var id: Long = 0
 
     /** The reaction message ID itself */

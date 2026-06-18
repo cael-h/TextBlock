@@ -59,6 +59,7 @@ import dev.octoshrimpy.quik.interactor.ActionDelayedMessage
 import dev.octoshrimpy.quik.interactor.AddScheduledMessage
 import dev.octoshrimpy.quik.interactor.DeleteMessages
 import dev.octoshrimpy.quik.interactor.MarkRead
+import dev.octoshrimpy.quik.interactor.SendEmojiReaction
 import dev.octoshrimpy.quik.interactor.SendExistingMessage
 import dev.octoshrimpy.quik.interactor.SaveImage
 import dev.octoshrimpy.quik.interactor.SendNewMessage
@@ -67,6 +68,7 @@ import dev.octoshrimpy.quik.manager.BillingManager
 import dev.octoshrimpy.quik.manager.PermissionManager
 import dev.octoshrimpy.quik.model.Attachment
 import dev.octoshrimpy.quik.model.Conversation
+import dev.octoshrimpy.quik.model.EmojiReaction
 import dev.octoshrimpy.quik.model.Message
 import dev.octoshrimpy.quik.model.MmsPart
 import dev.octoshrimpy.quik.model.Recipient
@@ -126,6 +128,7 @@ class ComposeViewModel @Inject constructor(
     private val permissionManager: PermissionManager,
     private val phoneNumberUtils: PhoneNumberUtils,
     private val prefs: Preferences,
+    private val sendEmojiReaction: SendEmojiReaction,
     private val sendExistingMessage: SendExistingMessage,
     private val sendNewMessage: SendNewMessage,
     private val subscriptionManager: SubscriptionManagerCompat,
@@ -791,17 +794,53 @@ class ComposeViewModel @Inject constructor(
             .mapNotNull { messageId -> messageRepo.getMessage(messageId) }
             .withLatestFrom(conversation) { message, conv ->
                 message.emojiReactions.map { reaction ->
-                    val contactName = conv.recipients
-                        .firstOrNull { recipient ->
-                            phoneNumberUtils.compare(recipient.address, reaction.senderAddress)
-                        }
-                        ?.getDisplayName()
-                        ?: reaction.senderAddress
+                    val contactName = when (reaction.senderAddress) {
+                        EmojiReaction.SENDER_SELF -> context.getString(R.string.compose_reaction_sender_me)
+                        else -> conv.recipients
+                            .firstOrNull { recipient ->
+                                phoneNumberUtils.compare(recipient.address, reaction.senderAddress)
+                            }
+                            ?.getDisplayName()
+                            ?: reaction.senderAddress
+                    }
                     "${reaction.emoji} $contactName"
                 }
             }
             .autoDisposable(view.scope())
             .subscribe { reactions -> view.showReactionsDialog(reactions) }
+
+        // Send an SMS-compatible reaction fallback and render it locally as a reaction badge
+        view.messageReactionSelectedIntent
+            .filter { permissionManager.isDefaultSms().also { if (!it) view.requestDefaultSms() } }
+            .withLatestFrom(state, conversation) { selection, state, conversation ->
+                val subId = state.subscription?.subscriptionId ?: -1
+                val addresses = conversation.recipients.map { it.address }
+                val sendAsGroup = addresses.size > 1 && state.sendAsGroup
+
+                SendEmojiReaction.Params(
+                    subId = subId,
+                    addresses = addresses,
+                    targetMessageId = selection.messageId,
+                    emoji = selection.emoji,
+                    sendAsGroup = sendAsGroup
+                )
+            }
+            .autoDisposable(view.scope())
+            .subscribe { params ->
+                disposables += sendEmojiReaction.buildObservable(params)
+                    .subscribeOn(Schedulers.io())
+                    .observeOn(AndroidSchedulers.mainThread())
+                    .subscribe({ result ->
+                        if (result.created) {
+                            view.clearSelection()
+                        } else {
+                            context.makeToast(R.string.compose_reaction_send_failed)
+                        }
+                    }, { error ->
+                        Timber.w(error, "emoji reaction send failed")
+                        context.makeToast(R.string.compose_reaction_send_failed)
+                    })
+            }
 
         // Set the current conversation
         Observables

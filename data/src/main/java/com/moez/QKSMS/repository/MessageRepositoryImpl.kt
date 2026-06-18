@@ -447,7 +447,8 @@ open class MessageRepositoryImpl @Inject constructor(
 
     override fun sendNewMessages(
         subId: Int, toAddresses: Collection<String>, body: String,
-        attachments: Collection<Attachment>, sendAsGroup: Boolean, delayMs: Int
+        attachments: Collection<Attachment>, sendAsGroup: Boolean, delayMs: Int,
+        signature: String?
     ): Collection<Message> {
         Timber.v("sending message(s)")
 
@@ -597,7 +598,7 @@ open class MessageRepositoryImpl @Inject constructor(
         // 3 stage sending process - stage 1, create records in os provider
         val group = (sendAsGroup && (toAddresses.size > 1))
         val messageUri = QkTransaction.createMessage(
-            context, subId, body, prefs.signature.get(),
+            context, subId, body, signature ?: prefs.signature.get(),
             toAddresses.map(phoneNumberUtils::normalizeNumber).toTypedArray(),
             parts, group, prefs.longAsMms.get(), prefs.unicode.get()
         )
@@ -638,6 +639,63 @@ open class MessageRepositoryImpl @Inject constructor(
 
         // send now (message will be exploded, as required, and all sent)
         return sendMessage(message)
+    }
+
+    override fun sendEmojiReaction(
+        subId: Int,
+        toAddresses: Collection<String>,
+        targetMessageId: Long,
+        emoji: String,
+        sendAsGroup: Boolean
+    ): Collection<Message> {
+        val targetMessage = getMessage(targetMessageId) ?: return listOf()
+        val reactionBody = reactions.buildOutgoingReactionBody(emoji, targetMessage.getText(false))
+        val reactionMessages = sendNewMessages(
+            subId = subId,
+            toAddresses = toAddresses,
+            body = reactionBody,
+            attachments = emptyList(),
+            sendAsGroup = sendAsGroup,
+            delayMs = 0,
+            signature = ""
+        )
+
+        if (reactionMessages.isNotEmpty()) {
+            saveOutgoingEmojiReaction(targetMessageId, emoji, reactionMessages)
+        }
+
+        return reactionMessages
+    }
+
+    private fun saveOutgoingEmojiReaction(
+        targetMessageId: Long,
+        emoji: String,
+        reactionMessages: Collection<Message>
+    ) {
+        Realm.getDefaultInstance().use { realm ->
+            realm.refresh()
+
+            val targetMessage = realm.where(Message::class.java)
+                .equalTo("id", targetMessageId)
+                .findFirst()
+                ?: return
+
+            realm.executeTransaction {
+                reactionMessages.forEach { reactionMessage ->
+                    val managedReactionMessage = realm.where(Message::class.java)
+                        .equalTo("id", reactionMessage.id)
+                        .findFirst()
+                        ?: return@forEach
+
+                    reactions.saveOutgoingEmojiReaction(
+                        reactionMessage = managedReactionMessage,
+                        emoji = emoji,
+                        targetMessage = targetMessage,
+                        realm = realm
+                    )
+                }
+            }
+        }
     }
 
     override fun sendMessage(message: Message): Collection<Message> {

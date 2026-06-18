@@ -87,7 +87,16 @@ interface MessageRepository {
 
     fun sendNewMessages(
         subId: Int, toAddresses: Collection<String>, body: String,
-        attachments: Collection<Attachment>, sendAsGroup: Boolean, delayMs: Int = 0
+        attachments: Collection<Attachment>, sendAsGroup: Boolean, delayMs: Int = 0,
+        signature: String? = null
+    ): Collection<Message>
+
+    fun sendEmojiReaction(
+        subId: Int,
+        toAddresses: Collection<String>,
+        targetMessageId: Long,
+        emoji: String,
+        sendAsGroup: Boolean
     ): Collection<Message>
 
     fun sendMessage(message: Message): Collection<Message>

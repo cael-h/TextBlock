@@ -89,6 +89,11 @@ class MessagesAdapter @Inject constructor(
     private val prefs: Preferences,
     private val textViewStyler: TextViewStyler,
 ) : QkRealmAdapter<Message, QkViewHolder>() {
+    data class ReactionRequest(
+        val messageId: Long,
+        val anchor: View
+    )
+
     class AudioState(
         var partId: Long = -1,
         var state: QkMediaPlayer.PlayingState = QkMediaPlayer.PlayingState.Stopped,
@@ -111,6 +116,7 @@ class MessagesAdapter @Inject constructor(
     val resendClicks: Subject<Long> = PublishSubject.create()
     val partContextMenuRegistrar: Subject<View> = PublishSubject.create()
     val reactionClicks: Subject<Long> = PublishSubject.create()
+    val reactionRequests: Subject<ReactionRequest> = PublishSubject.create()
 
     var data: Pair<Conversation, RealmResults<Message>>? = null
         set(value) {
@@ -181,9 +187,12 @@ class MessagesAdapter @Inject constructor(
                 }
             }
             view.setOnLongClickListener {
-                getItem(adapterPosition)?.let {
-                    toggleSelection(it.id)
-                    view.isActivated = isSelected(it.id)
+                getItem(adapterPosition)?.let { message ->
+                    toggleSelection(message.id)
+                    view.isActivated = isSelected(message.id)
+                    if (!message.isMe() && message.hasNonWhitespaceText()) {
+                        reactionRequests.onNext(ReactionRequest(message.id, view))
+                    }
                 }
                 true
             }

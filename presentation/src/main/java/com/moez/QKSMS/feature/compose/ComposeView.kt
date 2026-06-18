@@ -31,6 +31,11 @@ import dev.octoshrimpy.quik.model.Recipient
 import io.reactivex.Observable
 import io.reactivex.subjects.Subject
 
+data class MessageReactionSelection(
+    val messageId: Long,
+    val emoji: String
+)
+
 interface ComposeView : QkView<ComposeState> {
 
     companion object {
@@ -78,6 +83,7 @@ interface ComposeView : QkView<ComposeState> {
     val clearCurrentMessageIntent: Subject<Boolean>
     val messageLinkAskIntent: Observable<Uri>
     val reactionClickIntent: Subject<Long>
+    val messageReactionSelectedIntent: Observable<MessageReactionSelection>
     val speechRecogniserIntent: Observable<*>
     val shadeIntent: Observable<Unit>
     val recordAudioStartStopRecording: Subject<Boolean>

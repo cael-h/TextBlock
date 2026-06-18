@@ -26,6 +26,9 @@ import android.app.TimePickerDialog
 import android.content.ActivityNotFoundException
 import android.content.ContentValues
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
@@ -43,7 +46,11 @@ import android.view.DragEvent.ACTION_DROP
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.PopupWindow
 import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.constraintlayout.widget.ConstraintSet
@@ -141,6 +148,7 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
     override val clearCurrentMessageIntent: Subject<Boolean> = PublishSubject.create()
     override val messageLinkAskIntent: Subject<Uri> by lazy { messageAdapter.messageLinkClicks }
     override val reactionClickIntent: Subject<Long> by lazy { messageAdapter.reactionClicks }
+    override val messageReactionSelectedIntent: Subject<MessageReactionSelection> = PublishSubject.create()
     override val speechRecogniserIntent by lazy { binding.speechToTextIcon.clicks() }
     override val shadeIntent by lazy { binding.shadeBackground.clicks() }
     override val recordAudioStartStopRecording: Subject<Boolean> = PublishSubject.create()
@@ -163,6 +171,8 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
     private val viewModel by lazy { ViewModelProviders.of(this, viewModelFactory)[ComposeViewModel::class.java] }
 
     private var cameraDestination: Uri? = null
+    private var reactionPopup: PopupWindow? = null
+    private val reactionOptions = listOf("👍", "❤️", "😂", "🙂", "😮", "👎")
 
     private fun getSeekBarUpdater(): ObservableSubscribeProxy<Long> {
         return Observable.interval(500, TimeUnit.MILLISECONDS)
@@ -244,6 +254,10 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
                 .mapNotNull { it }
                 .autoDisposable(scope())
                 .subscribe { registerForContextMenu(it) }
+
+            messageAdapter.reactionRequests
+                .autoDisposable(scope())
+                .subscribe(::showMessageReactionPopup)
 
             // drag drop handlers for speech-to-text icon
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -716,6 +730,67 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
             .setTitle(R.string.compose_reactions_title)
             .setMessage(reactions.joinToString("\n"))
             .show()
+    }
+
+    private fun showMessageReactionPopup(request: MessagesAdapter.ReactionRequest) {
+        reactionPopup?.dismiss()
+        val currentTheme = colors.theme()
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(
+                8.dpToPx(this@ComposeActivity),
+                6.dpToPx(this@ComposeActivity),
+                8.dpToPx(this@ComposeActivity),
+                6.dpToPx(this@ComposeActivity)
+            )
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = 28.dpToPx(this@ComposeActivity).toFloat()
+                setColor(currentTheme.theme)
+            }
+            elevation = 8.dpToPx(this@ComposeActivity).toFloat()
+        }
+
+        val popup = PopupWindow(
+            row,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            true
+        ).apply {
+            isOutsideTouchable = true
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+        }
+
+        reactionOptions.forEach { emoji ->
+            row.addView(
+                TextView(this).apply {
+                    text = emoji
+                    textSize = 26f
+                    gravity = android.view.Gravity.CENTER
+                    minWidth = 44.dpToPx(this@ComposeActivity)
+                    minHeight = 44.dpToPx(this@ComposeActivity)
+                    setTextColor(currentTheme.textPrimary)
+                    setOnClickListener {
+                        messageReactionSelectedIntent.onNext(
+                            MessageReactionSelection(request.messageId, emoji)
+                        )
+                        popup.dismiss()
+                    }
+                },
+                LinearLayout.LayoutParams(
+                    44.dpToPx(this@ComposeActivity),
+                    44.dpToPx(this@ComposeActivity)
+                )
+            )
+        }
+
+        reactionPopup = popup
+        popup.showAsDropDown(
+            request.anchor,
+            0,
+            -(request.anchor.height + 58.dpToPx(this))
+        )
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
