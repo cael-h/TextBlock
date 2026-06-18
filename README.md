@@ -25,6 +25,18 @@ QUIK is an open source replacement to the [stock messaging app](https://github.c
 - Emoji reaction handling
 - and much, much more
 
+## TextBlock Usage Notes
+
+### Message Reactions
+
+To react to a received message, long-press the empty area of that message row
+just outside the message text. For example, press the blank space immediately to
+the right of the text bubble, then choose a reaction from the popup.
+
+Long-pressing directly on the text keeps Android text selection available, so
+you can select and copy individual words or characters instead of selecting the
+whole message.
+
 ## Download
 
 Grab QUIK from the official [github releases page](https://github.com/octoshrimpy/quik/releases), or keep up with updates with the following:
