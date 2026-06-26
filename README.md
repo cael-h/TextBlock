@@ -37,6 +37,15 @@ Long-pressing directly on the text keeps Android text selection available, so
 you can select and copy individual words or characters instead of selecting the
 whole message.
 
+### Block Similar Text
+
+To teach TextBlock from a missed spam message, long-press the message text and
+choose "Block similar text" from the text-selection menu.
+
+You can also long-press the empty area of the message row to select the whole
+message, then choose "Block similar text" from the conversation toolbar or its
+overflow menu.
+
 ## Download
 
 Grab QUIK from the official [github releases page](https://github.com/octoshrimpy/quik/releases), or keep up with updates with the following:

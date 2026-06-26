@@ -492,9 +492,12 @@ class ComposeViewModel @Inject constructor(
             .subscribe { view.clearSelection() }
 
         // Save a local TextBlock correction from selected message text
-        view.optionsItemIntent
-            .filter { it == R.id.textblock_block_similar }
-            .withLatestFrom(view.messagesSelectedIntent) { _, messageIds -> messageIds }
+        Observable.merge(
+            view.optionsItemIntent
+                .filter { it == R.id.textblock_block_similar }
+                .withLatestFrom(view.messagesSelectedIntent) { _, messageIds -> messageIds },
+            view.textBlockBlockSimilarIntent.map { messageId -> listOf(messageId) }
+        )
             .observeOn(Schedulers.io())
             .map { messageIds ->
                 textBlockCorrectionReview.recordSelectedMessages(

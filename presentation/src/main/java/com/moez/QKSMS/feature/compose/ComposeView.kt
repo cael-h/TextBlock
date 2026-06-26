@@ -84,6 +84,7 @@ interface ComposeView : QkView<ComposeState> {
     val messageLinkAskIntent: Observable<Uri>
     val reactionClickIntent: Subject<Long>
     val messageReactionSelectedIntent: Observable<MessageReactionSelection>
+    val textBlockBlockSimilarIntent: Observable<Long>
     val speechRecogniserIntent: Observable<*>
     val shadeIntent: Observable<Unit>
     val recordAudioStartStopRecording: Subject<Boolean>

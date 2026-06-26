@@ -32,7 +32,10 @@ import android.text.style.ClickableSpan
 import android.text.style.StyleSpan
 import android.text.style.URLSpan
 import android.text.util.Linkify
+import android.view.ActionMode
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -117,6 +120,7 @@ class MessagesAdapter @Inject constructor(
     val partContextMenuRegistrar: Subject<View> = PublishSubject.create()
     val reactionClicks: Subject<Long> = PublishSubject.create()
     val reactionRequests: Subject<ReactionRequest> = PublishSubject.create()
+    val textBlockBlockSimilarRequests: Subject<Long> = PublishSubject.create()
 
     var data: Pair<Conversation, RealmResults<Message>>? = null
         set(value) {
@@ -413,6 +417,7 @@ class MessagesAdapter @Inject constructor(
         body.apply {
             text = spanString
             setVisible(message.isSms() || spanString.isNotBlank())
+            customSelectionActionModeCallback = buildTextSelectionActionModeCallback(message)
 
             setBackgroundResource(
                 getBubble(
@@ -434,6 +439,37 @@ class MessagesAdapter @Inject constructor(
         }
 
         showEmojiReactions(reactions, reactionText, message)
+    }
+
+    private fun buildTextSelectionActionModeCallback(message: Message): ActionMode.Callback {
+        return object : ActionMode.Callback {
+            override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
+                if (message.hasNonWhitespaceText()) {
+                    menu.add(
+                        Menu.NONE,
+                        R.id.textblock_block_similar,
+                        Menu.NONE,
+                        R.string.compose_menu_textblock_block_similar
+                    ).setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
+                }
+
+                return true
+            }
+
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = false
+
+            override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
+                if (item.itemId != R.id.textblock_block_similar) {
+                    return false
+                }
+
+                textBlockBlockSimilarRequests.onNext(message.id)
+                mode.finish()
+                return true
+            }
+
+            override fun onDestroyActionMode(mode: ActionMode) = Unit
+        }
     }
 
     private fun showEmojiReactions(reactionsContainer: View, reactionTextView: TextView, message: Message) {

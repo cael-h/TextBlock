@@ -149,6 +149,7 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
     override val messageLinkAskIntent: Subject<Uri> by lazy { messageAdapter.messageLinkClicks }
     override val reactionClickIntent: Subject<Long> by lazy { messageAdapter.reactionClicks }
     override val messageReactionSelectedIntent: Subject<MessageReactionSelection> = PublishSubject.create()
+    override val textBlockBlockSimilarIntent: Subject<Long> by lazy { messageAdapter.textBlockBlockSimilarRequests }
     override val speechRecogniserIntent by lazy { binding.speechToTextIcon.clicks() }
     override val shadeIntent by lazy { binding.shadeBackground.clicks() }
     override val recordAudioStartStopRecording: Subject<Boolean> = PublishSubject.create()
