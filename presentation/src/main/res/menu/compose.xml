@@ -86,7 +86,7 @@
         android:icon="@drawable/ic_block_white_24dp"
         android:title="@string/compose_menu_textblock_block_similar"
         android:visible="false"
-        app:showAsAction="ifRoom" />
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/forward"

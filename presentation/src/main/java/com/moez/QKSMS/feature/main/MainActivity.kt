@@ -29,6 +29,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewStub
+import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
@@ -60,6 +61,7 @@ import dev.octoshrimpy.quik.feature.blocking.BlockingDialog
 import dev.octoshrimpy.quik.databinding.MainActivityBinding
 import dev.octoshrimpy.quik.databinding.MainPermissionHintBinding
 import dev.octoshrimpy.quik.databinding.MainSyncingBinding
+import dev.octoshrimpy.quik.feature.blocking.messages.TextBlockCorrectionReviewResult
 import dev.octoshrimpy.quik.feature.changelog.ChangelogDialog
 import dev.octoshrimpy.quik.feature.conversations.ConversationItemTouchCallback
 import dev.octoshrimpy.quik.feature.conversations.ConversationsAdapter
@@ -262,6 +264,7 @@ class MainActivity : QkThemedActivity(), MainView {
             findItem(R.id.unread)?.isVisible = ( !markRead && selectedConversations != 0 ) ||
                     selectedConversations > 1
             findItem(R.id.block)?.isVisible = selectedConversations != 0
+            findItem(R.id.block_similar)?.isVisible = selectedConversations != 0
             findItem(R.id.rename)?.isVisible = selectedConversations == 1
         }
 
@@ -451,6 +454,23 @@ class MainActivity : QkThemedActivity(), MainView {
         )
             .setText(conversationName)
             .show()
+
+    override fun showTextBlockCorrectionResult(result: TextBlockCorrectionReviewResult) {
+        val message = when {
+            result.saved == 0 -> getString(R.string.textblock_correction_no_text)
+            else -> resources.getQuantityString(
+                R.plurals.textblock_correction_block_similar_saved,
+                result.saved,
+                result.saved
+            )
+        }
+
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun showTextBlockCorrectionSaveFailed() {
+        Toast.makeText(this, R.string.textblock_correction_save_failed, Toast.LENGTH_SHORT).show()
+    }
 
     override fun showChangelog(changelog: ChangelogManager.CumulativeChangelog) =
         changelogDialog.show(changelog)

@@ -102,6 +102,11 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Named
 
+private data class TextBlockCorrectionRequest(
+    val messageIds: List<Long>,
+    val threadId: Long
+)
+
 class ComposeViewModel @Inject constructor(
     @Named("query") private val query: String,
     @Named("threadId") private val threadId: Long,
@@ -495,15 +500,35 @@ class ComposeViewModel @Inject constructor(
         Observable.merge(
             view.optionsItemIntent
                 .filter { it == R.id.textblock_block_similar }
-                .withLatestFrom(view.messagesSelectedIntent) { _, messageIds -> messageIds },
-            view.textBlockBlockSimilarIntent.map { messageId -> listOf(messageId) }
+                .withLatestFrom(
+                    view.messagesSelectedIntent.startWith(emptyList<Long>()),
+                    state
+                ) { _, messageIds, state ->
+                    TextBlockCorrectionRequest(
+                        messageIds = messageIds,
+                        threadId = state.threadId
+                    )
+                },
+            view.textBlockBlockSimilarIntent.map { messageId ->
+                TextBlockCorrectionRequest(
+                    messageIds = listOf(messageId),
+                    threadId = 0
+                )
+            }
         )
             .observeOn(Schedulers.io())
-            .map { messageIds ->
-                textBlockCorrectionReview.recordSelectedMessages(
-                    CorrectionAction.BLOCK_SIMILAR,
-                    messageIds
-                )
+            .map { request ->
+                when {
+                    request.messageIds.isNotEmpty() -> textBlockCorrectionReview.recordSelectedMessages(
+                        CorrectionAction.BLOCK_SIMILAR,
+                        request.messageIds
+                    )
+                    request.threadId > 0 -> textBlockCorrectionReview.record(
+                        CorrectionAction.BLOCK_SIMILAR,
+                        listOf(request.threadId)
+                    )
+                    else -> TextBlockCorrectionReviewResult(saved = 0, skipped = 1)
+                }
             }
             .observeOn(AndroidSchedulers.mainThread())
             .autoDisposable(view.scope())

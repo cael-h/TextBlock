@@ -39,12 +39,20 @@ whole message.
 
 ### Block Similar Text
 
-To teach TextBlock from a missed spam message, long-press the message text and
-choose "Block similar text" from the text-selection menu.
+To teach TextBlock from a missed spam message in the main inbox, long-press the
+conversation row and choose "Block similar" from the top toolbar overflow menu.
+TextBlock will learn from the latest incoming local text in that conversation.
+
+Inside an open conversation, choose "Block similar text" from the top toolbar
+overflow menu to learn from the latest incoming local text in that thread.
 
 You can also long-press the empty area of the message row to select the whole
 message, then choose "Block similar text" from the conversation toolbar or its
 overflow menu.
+
+Long-pressing directly on message text may also show "Block similar text" in the
+Android text-selection menu on devices that expose custom text-selection
+actions.
 
 ## Download
 

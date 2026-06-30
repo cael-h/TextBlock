@@ -450,7 +450,10 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
         binding.toolbar.menu.findItem(R.id.share)?.isVisible =
             !state.editingMode && state.selectedMessages > 0 && state.selectedMessagesHaveText
         binding.toolbar.menu.findItem(R.id.textblock_block_similar)?.isVisible =
-            !state.editingMode && state.selectedMessages > 0 && state.selectedMessagesHaveText
+            !state.editingMode && state.query.isEmpty() && (
+                    (state.selectedMessages > 0 && state.selectedMessagesHaveText) ||
+                            (state.selectedMessages == 0 && state.threadId > 0)
+                    )
         binding.toolbar.menu.findItem(R.id.details)?.isVisible = !state.editingMode && state.selectedMessages == 1
         binding.toolbar.menu.findItem(R.id.delete)?.isVisible = !state.editingMode && ((state.selectedMessages > 0) || state.canSend)
         binding.toolbar.menu.findItem(R.id.forward)?.isVisible = !state.editingMode && state.selectedMessages == 1

@@ -25,6 +25,7 @@ import dev.octoshrimpy.quik.R
 import dev.octoshrimpy.quik.common.Navigator
 import dev.octoshrimpy.quik.common.base.QkViewModel
 import dev.octoshrimpy.quik.extensions.mapNotNull
+import dev.octoshrimpy.quik.feature.blocking.messages.TextBlockCorrectionReview
 import dev.octoshrimpy.quik.interactor.DeleteConversations
 import dev.octoshrimpy.quik.interactor.MarkAllSeen
 import dev.octoshrimpy.quik.interactor.MarkArchived
@@ -48,6 +49,7 @@ import dev.octoshrimpy.quik.repository.ConversationRepository
 import dev.octoshrimpy.quik.repository.EmojiReactionRepository
 import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.repository.SyncRepository
+import dev.octoshrimpy.quik.textblock.correction.CorrectionAction
 import dev.octoshrimpy.quik.util.Preferences
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.rxkotlin.plusAssign
@@ -56,6 +58,7 @@ import io.realm.Realm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -83,7 +86,8 @@ class MainViewModel @Inject constructor(
     private val ratingManager: RatingManager,
     private val reactions: EmojiReactionRepository,
     private val syncContacts: SyncContacts,
-    private val syncMessages: SyncMessages
+    private val syncMessages: SyncMessages,
+    private val textBlockCorrectionReview: TextBlockCorrectionReview
 ) : QkViewModel<MainView, MainState>(
     MainState(page = Inbox(data = conversationRepo.getConversations(prefs.unreadAtTop.get())))
 ) {
@@ -446,6 +450,28 @@ class MainViewModel @Inject constructor(
                 }
                 .autoDisposable(view.scope())
                 .subscribe()
+
+        view.optionsItemIntent
+            .filter { itemId -> itemId == R.id.block_similar }
+            .withLatestFrom(view.conversationsSelectedIntent) { _, conversations -> conversations }
+            .observeOn(Schedulers.io())
+            .map { conversations ->
+                textBlockCorrectionReview.record(
+                    CorrectionAction.BLOCK_SIMILAR,
+                    conversations.toList()
+                )
+            }
+            .observeOn(AndroidSchedulers.mainThread())
+            .autoDisposable(view.scope())
+            .subscribe({ result ->
+                view.showTextBlockCorrectionResult(result)
+                if (result.saved > 0) {
+                    view.clearSelection()
+                }
+            }, { error ->
+                Timber.w(error, "failed to record TextBlock correction from inbox")
+                view.showTextBlockCorrectionSaveFailed()
+            })
 
         view.optionsItemIntent
             .filter { itemId -> itemId == R.id.rename }

@@ -20,6 +20,7 @@ package dev.octoshrimpy.quik.feature.main
 
 import android.content.Intent
 import dev.octoshrimpy.quik.common.base.QkView
+import dev.octoshrimpy.quik.feature.blocking.messages.TextBlockCorrectionReviewResult
 import dev.octoshrimpy.quik.manager.ChangelogManager
 import io.reactivex.Observable
 
@@ -53,6 +54,8 @@ interface MainView : QkView<MainState> {
     fun showBlockingDialog(conversations: List<Long>, block: Boolean)
     fun showDeleteDialog(conversations: List<Long>)
     fun showRenameDialog(conversationName: String)
+    fun showTextBlockCorrectionResult(result: TextBlockCorrectionReviewResult)
+    fun showTextBlockCorrectionSaveFailed()
     fun showChangelog(changelog: ChangelogManager.CumulativeChangelog)
     fun showArchivedSnackbar(countConversationsArchived: Int, isArchiving: Boolean)
     fun drawerToggled(opened: Boolean)
