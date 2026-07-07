@@ -48,22 +48,23 @@ Billing or left out of the first submission.
   https://support.google.com/googleplay/android-developer/answer/9866151
 - Google Play payments policy:
   https://support.google.com/googleplay/android-developer/answer/10281818
+- Detailed app setup answers:
+  docs/PLAY_CONSOLE_APP_SETUP_ANSWERS.md
 
 ## Hard Blockers Before Upload
 
 ### 1. Target SDK
 
 Google Play currently requires new phone apps and updates to target Android 15,
-API level 35, or higher. TextBlock currently targets API 33, so this must be
-updated before Play accepts a new submission.
+API level 35, or higher. TextBlock now targets API 35. Keep this current for
+future uploads and increment `versionCode` for every Play artifact.
 
 Implementation tasks:
 
-- Install Android platform 35 and compatible build tools into the Termux SDK
-  shim.
-- Update `presentation/build.gradle` from `compileSdk 34` /
-  `targetSdkVersion 33` to API 35.
-- Build and fix any compile/runtime issues caused by the target SDK bump.
+- Done: installed Android platform 35 and compatible build tools into the Termux
+  SDK shim.
+- Done: updated Gradle SDK targets to API 35.
+- Done: built release APK and AAB locally.
 - Smoke-test SMS receive, send, notification suppression, default SMS setup,
   quarantine, "Block Similar," and reaction UI on device.
 
@@ -386,7 +387,9 @@ Avoid parallel edits to:
 
 ## Immediate Next Step
 
-Phase 1 build compliance is complete except device install smoke testing. The
-next engineering task is to audit sensitive manifest permissions and prepare the
-privacy / SMS permission declaration material while the user creates the Play
-Console app entry and verifies account contact details.
+Phase 1 build compliance is complete except device install smoke testing. Use
+`docs/PLAY_CONSOLE_APP_SETUP_ANSWERS.md` to complete or correct the Play
+Console app setup forms. The next engineering task is to replace the stale root
+`PRIVACY` file with a TextBlock-specific privacy policy, add an in-app privacy
+policy link, and decide whether to hide legacy external blocking managers for
+the first Play submission or disclose their optional data sharing behavior.
