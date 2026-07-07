@@ -16,12 +16,13 @@ Billing or left out of the first submission.
 
 - Branch: `textblock-filter-foundation`
 - Package/application id: `com.caelh.textblock`
-- Version: `4.3.6`
-- Version code: `2238`
-- Current target SDK: `33`
-- Current compile SDK: `34`
-- Release APK builds locally, but Google Play requires an Android App Bundle
-  for new apps.
+- Version: `4.3.7`
+- Version code: `2239`
+- Current target SDK: `35`
+- Current compile SDK: `35`
+- Release APK and Android App Bundle build locally.
+- Device install remains blocked until an ADB target is attached or wireless ADB
+  is enabled.
 
 ## Official Requirements Checked
 
@@ -385,7 +386,7 @@ Avoid parallel edits to:
 
 ## Immediate Next Step
 
-Start Phase 1. The first engineering task is to update the local SDK/build setup
-for API 35, raise TextBlock's target SDK, build a signed AAB, and smoke-test the
-result. In parallel, the user should create the Play Console app entry and
-verify account contact details.
+Phase 1 build compliance is complete except device install smoke testing. The
+next engineering task is to audit sensitive manifest permissions and prepare the
+privacy / SMS permission declaration material while the user creates the Play
+Console app entry and verifies account contact details.
