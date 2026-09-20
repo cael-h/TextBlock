@@ -56,6 +56,25 @@ class TextBlockReceivePolicyTest {
     }
 
     @Test
+    fun contactAlwaysAllowsSenderWithoutClassifying() {
+        var classifyCalls = 0
+
+        val decision = TextBlockReceivePolicy.evaluate(
+            filteringEnabled = true,
+            allowContacts = false,
+            isFromContact = true,
+            dropMode = true
+        ) {
+            classifyCalls++
+            quarantineResult
+        }
+
+        assertEquals(TextBlockReceiveEffect.ALLOW, decision.effect)
+        assertFalse(decision.suppressesNotification)
+        assertEquals(0, classifyCalls)
+    }
+
+    @Test
     fun quarantineModeQuarantinesSuppressingClassificationResult() {
         val decision = TextBlockReceivePolicy.evaluate(
             filteringEnabled = true,

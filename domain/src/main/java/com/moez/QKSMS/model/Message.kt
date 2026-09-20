@@ -138,6 +138,24 @@ open class Message : RealmObject() {
         }
     }
 
+    fun hasReactableContent(): Boolean = getReactionTargetText().isNotBlank()
+
+    fun getReactionTargetText(): String {
+        val text = getText(false).trim()
+        if (text.isNotEmpty()) return text
+
+        return when {
+            parts.any { it.type.startsWith("image/", ignoreCase = true) } -> "an image"
+            parts.any { it.type.startsWith("video/", ignoreCase = true) } -> "a video"
+            parts.any { it.type.startsWith("audio/", ignoreCase = true) } -> "an audio message"
+            isMms() && parts.any {
+                !it.type.equals("application/smil", ignoreCase = true) &&
+                    !it.type.equals("text/plain", ignoreCase = true)
+            } -> "an attachment"
+            else -> getCleansedSubject().trim()
+        }
+    }
+
     /**
      * Returns the text that should be displayed when a preview of the message
      * needs to be displayed, such as in the conversation view or in a notification

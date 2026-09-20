@@ -214,7 +214,7 @@ class EmojiReactionRepositoryImpl @Inject constructor(
 
         val originalMessageRegex = parseTruncatedMessages(originalMessageText)
         val match = messages.find { message ->
-            originalMessageRegex.matches(message.getText(false).trim())
+            originalMessageRegex.matches(message.getReactionTargetText().trim())
         }
         if (match != null) {
             Timber.d("Found match for reaction target: message ID ${match.id}")
@@ -299,7 +299,7 @@ class EmojiReactionRepositoryImpl @Inject constructor(
             reactionMessageId = reactionMessage.id
             senderAddress = EmojiReaction.SENDER_SELF
             this.emoji = emoji
-            originalMessageText = targetMessage.getText(false)
+            originalMessageText = targetMessage.getReactionTargetText()
             threadId = reactionMessage.threadId
         }
         realm.insertOrUpdate(reaction)

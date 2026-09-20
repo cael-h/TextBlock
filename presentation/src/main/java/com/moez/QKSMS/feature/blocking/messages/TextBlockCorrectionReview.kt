@@ -97,6 +97,10 @@ class TextBlockCorrectionReview @Inject constructor(
             }
         }
 
+        if (action == CorrectionAction.NOT_SPAM) {
+            messageRepo.clearTextBlockQuarantine(messages.map { message -> message.id })
+        }
+
         return TextBlockCorrectionReviewResult(saved = saved, skipped = skipped)
     }
 }

@@ -111,6 +111,12 @@ interface MessageRepository {
 
     fun deleteMessages(messageIds: Collection<Long>)
 
+    fun markTextBlockQuarantined(messageId: Long, quarantinedAtMillis: Long = System.currentTimeMillis())
+
+    fun clearTextBlockQuarantine(messageIds: Collection<Long>)
+
+    fun deleteExpiredTextBlockQuarantine(beforeMillis: Long): Int
+
     fun getOldMessageCounts(maxAgeDays: Int): Map<Long, Int>
 
     fun deleteOldMessages(maxAgeDays: Int)

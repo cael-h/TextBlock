@@ -42,6 +42,8 @@ class AboutPresenter @Inject constructor(
 
                         R.id.changelog -> navigator.showChangelog()
 
+                        R.id.privacy -> navigator.showPrivacyPolicy()
+
                         R.id.contact -> navigator.showSupport()
 
                         R.id.license -> navigator.showLicense()

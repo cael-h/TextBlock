@@ -21,10 +21,17 @@ without relying on cloud services.
 Primary behavior:
 
 - Normal messages stay in the regular conversation flow.
+- Senders present in Android Contacts are always allowed and are never subject
+  to blocked-sender, content-filter, or TextBlock political classification.
 - Political spam is suppressed from normal notifications.
 - Filtered messages remain reviewable in a blocked/quarantine area unless the
   user enables hard drop.
 - The user can correct false positives and false negatives.
+
+Classification runs deterministic rules first, then a tiny on-device neural
+classifier for messages the rules allow. The neural result must exceed a
+conservative confidence threshold. Model loading or inference failures allow
+the message, and Android Contacts bypass both classifiers.
 
 ## Existing QUIK Hooks
 

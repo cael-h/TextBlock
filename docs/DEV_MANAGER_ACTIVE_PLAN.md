@@ -169,7 +169,11 @@ Result:
 
 - Merged `textblock-inbound-filter` into `textblock-filter-foundation`.
 - `InboundMessageClassifier` is provided through Dagger and assigned by `InjectionWorkerFactory` to SMS/MMS receive workers.
-- SMS and MMS receive paths classify after existing blocked-sender and user content-filter checks, and before normal notification work.
+- SMS and MMS receive paths classify unknown senders after existing blocked-sender
+  and user content-filter checks, and before normal notification work.
+- Android Contacts are an unconditional allowlist: SMS/MMS receive paths bypass
+  legacy blocked-sender/content filters and TextBlock classification for contact
+  senders, and clear any existing blocked-thread state before notifying.
 - TextBlock `QUARANTINE`, `BLOCK_CONVERSATION`, and `DROP` actions suppress notification by marking the thread read and marking the conversation blocked; no TextBlock path deletes messages by default.
 - Reviewer finding on MMS acknowledgement was implemented: classified MMS no longer returns before `sendAcknowledgeInd(...)` / `sendNotifyRespInd(...)`.
 
@@ -678,9 +682,9 @@ Residual risk:
 - Manual phone/emulator testing is still needed for Settings UI behavior,
   Realm migration on an existing install, and actual SMS provider delete/read
   side effects.
-- The cleanup tool currently applies the same contact allowlist setting used by
-  live filtering. It forces filtering on for manual scans so disabled live
-  filtering does not prevent an intentional cleanup run.
+- The cleanup tool forces filtering on for manual scans so disabled live
+  filtering does not prevent an intentional cleanup run, but it always skips
+  Android Contacts regardless of the contact preference.
 
 ## Batch 5 Release Build
 
@@ -733,3 +737,27 @@ Install note:
 - [x] Classifier tests added with Android SDK test blocker documented.
 - [x] Review docs produced for completed implementation slices.
 - [x] Branch pushed to `origin`.
+
+## Batch 6 Messaging UX And Compatibility
+
+Completed in the 4.3.8 device test build:
+
+- Android 15 IME inset handling so the keyboard no longer covers the composer.
+- Reactions on image-, video-, audio-, and attachment-only incoming MMS.
+- A full AndroidX emoji picker opened from a `+` in the quick reaction bar.
+- Verified that existing `MessagingStyle` and `RemoteInput` notifications are
+  eligible for Samsung Galaxy Watch mirroring; no watch-specific app code is
+  required for basic notifications and replies.
+
+In progress for the next build:
+
+- Explicit animated GIF decoding in inline message thumbnails.
+- Opt-in HTTPS link previews with strict URL/IP/redirect/size validation,
+  bounded local caching, cancellable row binding, and no Realm schema change.
+- Update the privacy policy and Play Console data-safety answers before enabling
+  automatic preview fetching in a distributed release.
+
+Protocol limit:
+
+- TextBlock is an SMS/MMS client. RCS-only stickers, native RCS reactions, and
+  other carrier RCS features cannot be received through the public SMS/MMS APIs.

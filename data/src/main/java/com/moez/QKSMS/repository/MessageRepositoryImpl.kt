@@ -52,6 +52,7 @@ import dev.octoshrimpy.quik.mapper.CursorToPart
 import dev.octoshrimpy.quik.model.Attachment
 import dev.octoshrimpy.quik.model.Conversation
 import dev.octoshrimpy.quik.model.Message
+import dev.octoshrimpy.quik.model.TextBlockQuarantine
 import dev.octoshrimpy.quik.model.Message.Companion.TYPE_MMS
 import dev.octoshrimpy.quik.model.Message.Companion.TYPE_SMS
 import dev.octoshrimpy.quik.model.MmsPart
@@ -649,7 +650,7 @@ open class MessageRepositoryImpl @Inject constructor(
         sendAsGroup: Boolean
     ): Collection<Message> {
         val targetMessage = getMessage(targetMessageId) ?: return listOf()
-        val reactionBody = reactions.buildOutgoingReactionBody(emoji, targetMessage.getText(false))
+        val reactionBody = reactions.buildOutgoingReactionBody(emoji, targetMessage.getReactionTargetText())
         val reactionMessages = sendNewMessages(
             subId = subId,
             toAddresses = toAddresses,
@@ -1092,6 +1093,41 @@ open class MessageRepositoryImpl @Inject constructor(
                     realm.executeTransaction { messages.deleteAllFromRealm() }
                 } ?: Unit
         }
+
+    override fun markTextBlockQuarantined(messageId: Long, quarantinedAtMillis: Long) {
+        Realm.getDefaultInstance().use { realm ->
+            realm.executeTransaction {
+                realm.copyToRealmOrUpdate(TextBlockQuarantine().apply {
+                    this.messageId = messageId
+                    this.quarantinedAtMillis = quarantinedAtMillis
+                })
+            }
+        }
+    }
+
+    override fun clearTextBlockQuarantine(messageIds: Collection<Long>) {
+        if (messageIds.isEmpty()) return
+        Realm.getDefaultInstance().use { realm ->
+            val records = realm.where(TextBlockQuarantine::class.java)
+                .anyOf("messageId", messageIds.toLongArray())
+                .findAll()
+            realm.executeTransaction { records.deleteAllFromRealm() }
+        }
+    }
+
+    override fun deleteExpiredTextBlockQuarantine(beforeMillis: Long): Int {
+        val messageIds = Realm.getDefaultInstance().use { realm ->
+            realm.where(TextBlockQuarantine::class.java)
+                .lessThan("quarantinedAtMillis", beforeMillis)
+                .findAll()
+                .map { record -> record.messageId }
+        }
+        if (messageIds.isEmpty()) return 0
+
+        deleteMessages(messageIds)
+        clearTextBlockQuarantine(messageIds)
+        return messageIds.size
+    }
 
     override fun getOldMessageCounts(maxAgeDays: Int) =
         Realm.getDefaultInstance().use { realm ->

@@ -194,7 +194,7 @@ class MessagesAdapter @Inject constructor(
                 getItem(adapterPosition)?.let { message ->
                     toggleSelection(message.id)
                     view.isActivated = isSelected(message.id)
-                    if (!message.isMe() && message.hasNonWhitespaceText()) {
+                    if (!message.isMe() && message.hasReactableContent()) {
                         reactionRequests.onNext(ReactionRequest(message.id, view))
                     }
                 }

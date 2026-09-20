@@ -28,12 +28,15 @@ import android.view.Gravity
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.view.ViewStub
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.view.GravityCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -147,6 +150,7 @@ class MainActivity : QkThemedActivity(), MainView {
         super.onCreate(savedInstanceState)
         binding = MainActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applyStatusBarInsetsForEdgeToEdge()
         viewModel.bindView(this)
         onNewIntentIntent.onNext(intent)
 
@@ -204,6 +208,67 @@ class MainActivity : QkThemedActivity(), MainView {
                     // Set the FAB compose icon color
                     binding.compose.setTint(theme.textPrimary)
                 }
+    }
+
+    private fun applyStatusBarInsetsForEdgeToEdge() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+
+        val toolbarLayoutParams = binding.toolbar.layoutParams as ViewGroup.MarginLayoutParams
+        val initialToolbarTopMargin = toolbarLayoutParams.topMargin
+        val inboxContent = binding.drawerLayout.getChildAt(0)
+        val initialContentLeftPadding = inboxContent.paddingLeft
+        val initialContentTopPadding = inboxContent.paddingTop
+        val initialContentRightPadding = inboxContent.paddingRight
+        val initialContentBottomPadding = inboxContent.paddingBottom
+        val drawer = binding.drawer.root
+        val initialDrawerLeftPadding = drawer.paddingLeft
+        val initialDrawerTopPadding = drawer.paddingTop
+        val initialDrawerRightPadding = drawer.paddingRight
+        val initialDrawerBottomPadding = drawer.paddingBottom
+        fun resolveTopInset(insets: WindowInsetsCompat?): Int {
+            val reportedInset = insets?.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+            )?.top ?: 0
+            if (reportedInset > 0) return reportedInset
+
+            val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            return resourceId.takeIf { it != 0 }
+                ?.let(resources::getDimensionPixelSize)
+                ?: 0
+        }
+
+        fun applyInsets(topInset: Int, bottomInset: Int) {
+            toolbarLayoutParams.topMargin = initialToolbarTopMargin + topInset
+            binding.toolbar.layoutParams = toolbarLayoutParams
+            inboxContent.setPadding(
+                initialContentLeftPadding,
+                initialContentTopPadding,
+                initialContentRightPadding,
+                initialContentBottomPadding + bottomInset
+            )
+            drawer.setPadding(
+                initialDrawerLeftPadding,
+                initialDrawerTopPadding + topInset,
+                initialDrawerRightPadding,
+                initialDrawerBottomPadding + bottomInset
+            )
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.drawerLayout) { _, insets ->
+            applyInsets(
+                resolveTopInset(insets),
+                insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            )
+            insets
+        }
+        binding.drawerLayout.post {
+            val insets = ViewCompat.getRootWindowInsets(binding.drawerLayout)
+            applyInsets(
+                resolveTopInset(insets),
+                insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+            )
+            ViewCompat.requestApplyInsets(binding.drawerLayout)
+        }
     }
 
     override fun onNewIntent(intent: Intent?) =

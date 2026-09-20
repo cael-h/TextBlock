@@ -19,7 +19,13 @@ object TextBlockReceivePolicy {
         dropMode: Boolean,
         classify: (isFromContactForClassifier: Boolean) -> ClassificationResult
     ): TextBlockReceiveDecision {
-        if (!TextBlockFilterPolicy.shouldClassify(filteringEnabled, allowContacts, isFromContact)) {
+        if (
+            !TextBlockFilterPolicy.shouldClassify(
+                filteringEnabled = filteringEnabled,
+                allowContacts = allowContacts,
+                isFromContact = isFromContact
+            )
+        ) {
             return TextBlockReceiveDecision.Allow
         }
 

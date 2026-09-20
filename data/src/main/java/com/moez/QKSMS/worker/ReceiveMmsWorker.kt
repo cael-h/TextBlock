@@ -59,6 +59,7 @@ import dev.octoshrimpy.quik.textblock.ClassificationResult
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
 import dev.octoshrimpy.quik.textblock.TextBlockMmsPostPersistencePlan
+import dev.octoshrimpy.quik.textblock.TextBlockReceiveDecision
 import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
 import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
 import dev.octoshrimpy.quik.textblock.toTextBlockBlockReason
@@ -155,8 +156,6 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                     locationUrl
                 )
 
-                DownloadManager.finishDownload(locationUrl)
-
                 // if message was persisted ok
                 if (messageUri != null) {
                     var mmsPostPersistencePlan = TextBlockMmsPostPersistencePlan.NotifyUser
@@ -178,49 +177,60 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                         // to check if it should be blocked after we've pulled it into realm. If it
                         // turns out that it should be dropped, then delete it
                         // TODO Don't store blocked messages in the first place
-                        val action = blockingClient.shouldBlock(message.address).blockingGet()
-                        val shouldDrop = prefs.drop.get()
-                        Timber.v("block=$action, drop=$shouldDrop")
-
-                        if (action is BlockingClient.Action.Block && shouldDrop) {
-                            messageRepo.deleteMessages(listOf(message.id))
-                            shouldNotify = false
+                        val senderIsContact = contactsRepo.isContact(message.address)
+                        val isTrustedSender = senderIsContact
+                        if (isTrustedSender) {
+                            Timber.v("trusted sender bypasses inbound filters")
+                            conversationRepo.markUnblocked(message.threadId)
                         } else {
-                            when (action) {
-                                is BlockingClient.Action.Block -> {
-                                    messageRepo.markRead(listOf(message.threadId))
-                                    conversationRepo.markBlocked(
-                                        listOf(message.threadId),
-                                        prefs.blockingManager.get(),
-                                        action.reason
-                                    )
-                                }
+                            val action = blockingClient.shouldBlock(message.address).blockingGet()
+                            val shouldDrop = prefs.drop.get()
+                            Timber.v("block=$action, drop=$shouldDrop")
 
-                                is BlockingClient.Action.Unblock ->
-                                    conversationRepo.markUnblocked(message.threadId)
-
-                                else -> Unit
-                            }
-
-                            val messageFilterAction = filterRepo.isBlocked(message.getText(), message.address, contactsRepo)
-                            if (messageFilterAction) {
-                                Timber.v("message dropped based on content filters")
+                            if (action is BlockingClient.Action.Block && shouldDrop) {
                                 messageRepo.deleteMessages(listOf(message.id))
                                 shouldNotify = false
+                            } else {
+                                when (action) {
+                                    is BlockingClient.Action.Block -> {
+                                        messageRepo.markRead(listOf(message.threadId))
+                                        conversationRepo.markBlocked(
+                                            listOf(message.threadId),
+                                            prefs.blockingManager.get(),
+                                            action.reason
+                                        )
+                                    }
+
+                                    is BlockingClient.Action.Unblock ->
+                                        conversationRepo.markUnblocked(message.threadId)
+
+                                    else -> Unit
+                                }
+
+                                val messageFilterAction = filterRepo.isBlocked(message.getText(), message.address, contactsRepo)
+                                if (messageFilterAction) {
+                                    Timber.v("message dropped based on content filters")
+                                    messageRepo.deleteMessages(listOf(message.id))
+                                    shouldNotify = false
+                                }
                             }
+                        }
 
                             if (shouldNotify) {
                                 // update the conversation
                                 conversationRepo.updateConversations(listOf(message.threadId))
 
-                                val senderIsContact = contactsRepo.isContact(message.address)
-                                val textBlockDecision = TextBlockReceivePolicy.evaluate(
-                                    filteringEnabled = prefs.textBlockFiltering.get(),
-                                    allowContacts = prefs.textBlockAllowContacts.get(),
-                                    isFromContact = senderIsContact,
-                                    dropMode = isTextBlockDropMode()
-                                ) { isFromContactForClassifier ->
-                                    classifyTextBlock(message, isFromContactForClassifier)
+                                val textBlockDecision = if (isTrustedSender) {
+                                    TextBlockReceiveDecision.Allow
+                                } else {
+                                    TextBlockReceivePolicy.evaluate(
+                                        filteringEnabled = prefs.textBlockFiltering.get(),
+                                        allowContacts = prefs.textBlockAllowContacts.get(),
+                                        isFromContact = senderIsContact,
+                                        dropMode = isTextBlockDropMode()
+                                    ) { isFromContactForClassifier ->
+                                        classifyTextBlock(message, isFromContactForClassifier)
+                                    }
                                 }
                                 mmsPostPersistencePlan =
                                     TextBlockReceivePolicy.mmsPostPersistencePlan(textBlockDecision)
@@ -232,6 +242,7 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                                         val textBlockResult =
                                             textBlockDecision.requireClassificationResult()
                                         Timber.v("TextBlock quarantined MMS as ${textBlockResult.action}")
+                                        messageRepo.markTextBlockQuarantined(message.id)
                                         messageRepo.markRead(listOf(message.threadId))
                                         conversationRepo.markBlocked(
                                             listOf(message.threadId),
@@ -278,7 +289,6 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
                                 }
                             }
                         }
-                    }
 
                     // send ack to mmsc
                     if (mmsPostPersistencePlan.shouldSendAcknowledgeInd) {
@@ -300,6 +310,7 @@ class ReceiveMmsWorker(appContext: Context, workerParams: WorkerParameters)
             Timber.e("mms receive worker exception: ${e.message}")
         } finally {
             downloadFile.delete()
+            DownloadManager.finishDownload(locationUrl)
         }
 
         Timber.v("finished")

@@ -166,9 +166,6 @@ class SettingsPresenter @Inject constructor(
                 }
             }
 
-        disposables += prefs.textBlockAllowContacts.asObservable()
-            .subscribe { enabled -> newState { copy(textBlockAllowContactsEnabled = enabled) } }
-
         disposables += syncRepo.syncProgress
                 .sample(16, TimeUnit.MILLISECONDS)
                 .distinctUntilChanged()
@@ -245,8 +242,6 @@ class SettingsPresenter @Inject constructor(
                         R.id.textBlockFiltering -> prefs.textBlockFiltering.set(!prefs.textBlockFiltering.get())
 
                         R.id.textBlockFilterMode -> view.showTextBlockFilterModeDialog()
-
-                        R.id.textBlockAllowContacts -> prefs.textBlockAllowContacts.set(!prefs.textBlockAllowContacts.get())
 
                         R.id.textBlockCleanup -> view.showTextBlockCleanupDialog()
 

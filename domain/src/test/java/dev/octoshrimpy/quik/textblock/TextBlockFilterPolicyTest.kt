@@ -29,7 +29,7 @@ class TextBlockFilterPolicyTest {
     }
 
     @Test
-    fun allowContactsSkipsClassificationForContacts() {
+    fun contactsAlwaysSkipClassification() {
         assertFalse(
             TextBlockFilterPolicy.shouldClassify(
                 filteringEnabled = true,
@@ -40,15 +40,15 @@ class TextBlockFilterPolicyTest {
     }
 
     @Test
-    fun disallowContactsClassifiesContactsAsNonContacts() {
-        assertTrue(
+    fun contactsAreMarkedAsContactsForClassifier() {
+        assertFalse(
             TextBlockFilterPolicy.shouldClassify(
                 filteringEnabled = true,
                 allowContacts = false,
                 isFromContact = true
             )
         )
-        assertFalse(
+        assertTrue(
             TextBlockFilterPolicy.isFromContactForClassifier(
                 allowContacts = false,
                 isFromContact = true

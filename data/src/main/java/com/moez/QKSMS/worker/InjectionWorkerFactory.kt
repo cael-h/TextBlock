@@ -67,7 +67,10 @@ class InjectionWorkerFactory @Inject constructor(
 
         when (instance) {
             is HousekeepingWorker ->
-                instance.scheduledMessageRepository = scheduledMessageRepository
+                instance.apply {
+                    scheduledMessageRepository = this@InjectionWorkerFactory.scheduledMessageRepository
+                    messageRepository = messageRepo
+                }
             is ReceiveSmsWorker -> {
                 instance.conversationRepo  = conversationRepo
                 instance.blockingClient = blockingClient

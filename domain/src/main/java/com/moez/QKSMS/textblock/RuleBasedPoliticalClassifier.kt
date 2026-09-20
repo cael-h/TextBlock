@@ -65,6 +65,11 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             matches += "political language"
         }
 
+        if (politicalMatches > 0 && complianceMatches > 0) {
+            score += 1
+            matches += "political opt-out combination"
+        }
+
         val localRaceMatches = localRaceTerms.count { text.containsWordOrPhrase(it) }
         if (localRaceMatches > 0) {
             score += localRaceMatches.coerceAtMost(2)
@@ -139,8 +144,11 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             "bldg-blue.org",
             "brooks4pa.com",
             "dasspac.org",
+            "demswin.us",
             "demconservationalliance.org",
             "fight-fascism.org",
+            "fwd-blue.com",
+            "forwardblue.us",
             "got-pac.org",
             "jg4co.org",
             "jp4tn.org",
@@ -168,6 +176,7 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             "reply stop",
             "stop to end",
             "stop2end",
+            "stop2quit",
             "msg&data",
             "msg & data",
             "end2end",
@@ -198,6 +207,8 @@ class RuleBasedPoliticalClassifier : InboundMessageClassifier {
             "congress",
             "congressional district",
             "democrat",
+            "democratic",
+            "democrats",
             "democratic primary",
             "democratic nominee",
             "democratic secretaries of state",

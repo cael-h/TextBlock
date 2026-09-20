@@ -47,8 +47,10 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupWindow
+import android.widget.ProgressBar
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -56,7 +58,11 @@ import androidx.appcompat.app.AlertDialog
 import androidx.constraintlayout.widget.ConstraintSet
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.emoji2.emojipicker.EmojiPickerView
+import androidx.emoji2.text.EmojiCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelProviders
 import com.google.android.flexbox.FlexboxLayoutManager
@@ -76,6 +82,7 @@ import dev.octoshrimpy.quik.common.util.extensions.autoScrollToStart
 import dev.octoshrimpy.quik.common.util.extensions.dpToPx
 import dev.octoshrimpy.quik.common.util.extensions.hideKeyboard
 import dev.octoshrimpy.quik.common.util.extensions.makeToast
+import dev.octoshrimpy.quik.common.util.extensions.resolveThemeColor
 import dev.octoshrimpy.quik.common.util.extensions.scrapViews
 import dev.octoshrimpy.quik.common.util.extensions.setBackgroundTint
 import dev.octoshrimpy.quik.common.util.extensions.setTint
@@ -191,6 +198,7 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
         super.onCreate(savedInstanceState)
         binding = ComposeActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        applySystemInsetsForEdgeToEdge()
         showBackButton(true)
         viewModel.bindView(this)
 
@@ -380,6 +388,47 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
             )
 
             window.callback = ComposeWindowCallback(window.callback, this)
+    }
+
+    private fun applySystemInsetsForEdgeToEdge() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+
+        val toolbarLayoutParams = binding.toolbar.layoutParams as ViewGroup.MarginLayoutParams
+        val initialToolbarTopMargin = toolbarLayoutParams.topMargin
+        val initialBottomPadding = binding.contentView.paddingBottom
+        fun resolveTopInset(insets: WindowInsetsCompat?): Int {
+            val reportedInset = insets?.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+            )?.top ?: 0
+            if (reportedInset > 0) return reportedInset
+
+            val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            return resourceId.takeIf { it != 0 }
+                ?.let(resources::getDimensionPixelSize)
+                ?: 0
+        }
+
+        fun applyTopInset(topInset: Int) {
+            toolbarLayoutParams.topMargin = initialToolbarTopMargin + topInset
+            binding.toolbar.layoutParams = toolbarLayoutParams
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.contentView) { view, insets ->
+            val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val navigationBottom = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            applyTopInset(resolveTopInset(insets))
+            view.setPadding(
+                view.paddingLeft,
+                view.paddingTop,
+                view.paddingRight,
+                initialBottomPadding + maxOf(imeBottom, navigationBottom)
+            )
+            insets
+        }
+        binding.contentView.post {
+            applyTopInset(resolveTopInset(ViewCompat.getRootWindowInsets(binding.contentView)))
+            ViewCompat.requestApplyInsets(binding.contentView)
+        }
     }
 
     override fun onStart() {
@@ -789,12 +838,107 @@ class ComposeActivity : QkThemedActivity(), ComposeView {
             )
         }
 
+        row.addView(
+            TextView(this).apply {
+                text = "+"
+                textSize = 30f
+                gravity = android.view.Gravity.CENTER
+                minWidth = 44.dpToPx(this@ComposeActivity)
+                minHeight = 44.dpToPx(this@ComposeActivity)
+                setTextColor(currentTheme.textPrimary)
+                contentDescription = getString(R.string.compose_reactions_more)
+                setOnClickListener {
+                    popup.dismiss()
+                    showEmojiReactionPicker(request.messageId)
+                }
+            },
+            LinearLayout.LayoutParams(
+                44.dpToPx(this@ComposeActivity),
+                44.dpToPx(this@ComposeActivity)
+            )
+        )
+
         reactionPopup = popup
         popup.showAsDropDown(
             request.anchor,
             0,
             -(request.anchor.height + 58.dpToPx(this))
         )
+    }
+
+    private fun showEmojiReactionPicker(messageId: Long) {
+        val pickerHeight = 420.dpToPx(this)
+        val container = FrameLayout(this).apply {
+            minimumHeight = pickerHeight
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                pickerHeight
+            )
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.compose_reactions_more)
+            .setView(container)
+            .setNegativeButton(R.string.button_cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            fun addPicker() = container.post {
+                if (!dialog.isShowing) return@post
+                if (container.childCount != 0) return@post
+
+                val picker = EmojiPickerView(this).apply {
+                    emojiGridColumns = 8
+                    emojiGridRows = 6f
+                    layoutParams = FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    setOnEmojiPickedListener { selected ->
+                        messageReactionSelectedIntent.onNext(
+                            MessageReactionSelection(messageId, selected.emoji)
+                        )
+                        dialog.dismiss()
+                    }
+                }
+                container.addView(picker)
+            }
+
+            val emojiCompat = EmojiCompat.get()
+            if (emojiCompat.loadState == EmojiCompat.LOAD_STATE_SUCCEEDED) {
+                addPicker()
+            } else {
+                container.addView(
+                    ProgressBar(this),
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        android.view.Gravity.CENTER
+                    )
+                )
+                emojiCompat.registerInitCallback(object : EmojiCompat.InitCallback() {
+                    override fun onInitialized() {
+                        emojiCompat.unregisterInitCallback(this)
+                        container.post {
+                            container.removeAllViews()
+                            addPicker()
+                        }
+                    }
+
+                    override fun onFailed(throwable: Throwable?) {
+                        emojiCompat.unregisterInitCallback(this)
+                        container.post {
+                            container.removeAllViews()
+                            container.addView(TextView(this@ComposeActivity).apply {
+                                text = getString(R.string.compose_reactions_picker_unavailable)
+                                gravity = android.view.Gravity.CENTER
+                                setTextColor(resolveThemeColor(android.R.attr.textColorPrimary))
+                            })
+                        }
+                    }
+                })
+            }
+        }
+        dialog.show()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {

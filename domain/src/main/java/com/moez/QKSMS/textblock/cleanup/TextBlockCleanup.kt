@@ -175,7 +175,7 @@ object TextBlockCleanupPlanner {
         var skippedContacts = 0
         val matches = candidates.mapNotNull { candidate ->
             val isFromContact = isContact(candidate.address)
-            if (params.allowContacts && isFromContact) {
+            if (isFromContact) {
                 skippedContacts++
                 return@mapNotNull null
             }

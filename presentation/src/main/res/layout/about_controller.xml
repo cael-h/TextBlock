@@ -62,6 +62,13 @@
             app:title="@string/about_changelog_title" />
 
         <dev.octoshrimpy.quik.common.widget.PreferenceView
+            android:id="@+id/privacy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:summary="@string/about_privacy"
+            app:title="@string/about_privacy_title" />
+
+        <dev.octoshrimpy.quik.common.widget.PreferenceView
             android:id="@+id/contact"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

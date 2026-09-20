@@ -195,12 +195,17 @@ class Navigator @Inject constructor(
     }
 
     fun showSourceCode() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/quik-sms/quik"))
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/cael-h/TextBlock"))
         startActivityExternal(intent)
     }
 
     fun showChangelog() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/quik-sms/quik/releases"))
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/cael-h/TextBlock/releases"))
+        startActivityExternal(intent)
+    }
+
+    fun showPrivacyPolicy() {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://cael-h.github.io/TextBlock/privacy/"))
         startActivityExternal(intent)
     }
 
@@ -269,8 +274,8 @@ class Navigator @Inject constructor(
     fun showSupport() {
         val intent = Intent(Intent.ACTION_SENDTO)
         intent.data = Uri.parse("mailto:")
-        intent.putExtra(Intent.EXTRA_EMAIL, arrayOf("quik@octo.sh"))
-        intent.putExtra(Intent.EXTRA_SUBJECT, "QUIK Support")
+        intent.putExtra(Intent.EXTRA_EMAIL, arrayOf("astrodynamaniac@gmail.com"))
+        intent.putExtra(Intent.EXTRA_SUBJECT, "TextBlock Support")
         intent.putExtra(Intent.EXTRA_TEXT, StringBuilder("\n\n")
                 .append("\n\n--- Please write your message above this line ---\n\n")
                 .append("Package: ${context.packageName}\n")

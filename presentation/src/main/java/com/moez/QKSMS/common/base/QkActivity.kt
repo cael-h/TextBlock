@@ -19,14 +19,18 @@
 package dev.octoshrimpy.quik.common.base
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import dev.octoshrimpy.quik.R
 import dev.octoshrimpy.quik.util.Preferences
 import io.reactivex.subjects.BehaviorSubject
@@ -66,13 +70,72 @@ abstract class QkActivity : AppCompatActivity() {
     override fun setContentView(layoutResID: Int) {
         super.setContentView(layoutResID)
         setSupportActionBar(toolbar)
+        applySystemBarInsetsForEdgeToEdge()
         title = title // The title may have been set before layout inflation
     }
 
     override fun setContentView(view: View?) {
         super.setContentView(view)
         setSupportActionBar(toolbar)
+        applySystemBarInsetsForEdgeToEdge()
         title = title // The title may have been set before layout inflation
+    }
+
+    private fun applySystemBarInsetsForEdgeToEdge() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+
+        val content = findViewById<ViewGroup>(android.R.id.content)
+        val root = content.getChildAt(0) ?: return
+        val screenToolbar = toolbar
+        val toolbarLayoutParams = screenToolbar?.layoutParams as? ViewGroup.MarginLayoutParams
+        val initialToolbarTopMargin = toolbarLayoutParams?.topMargin ?: 0
+        val initialLeftPadding = root.paddingLeft
+        val initialTopPadding = root.paddingTop
+        val initialRightPadding = root.paddingRight
+        val initialBottomPadding = root.paddingBottom
+
+        fun resolveTopInset(insets: WindowInsetsCompat?): Int {
+            val reportedInset = insets?.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout()
+            )?.top ?: 0
+            if (reportedInset > 0) return reportedInset
+
+            val resourceId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            return resourceId.takeIf { it != 0 }
+                ?.let(resources::getDimensionPixelSize)
+                ?: 0
+        }
+
+        fun applyInsets(insets: WindowInsetsCompat?) {
+            val topInset = resolveTopInset(insets)
+            val bottomInset = insets?.getInsets(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0
+            if (toolbarLayoutParams != null) {
+                toolbarLayoutParams.topMargin = initialToolbarTopMargin + topInset
+                screenToolbar.layoutParams = toolbarLayoutParams
+                root.setPadding(
+                    initialLeftPadding,
+                    initialTopPadding,
+                    initialRightPadding,
+                    initialBottomPadding + bottomInset
+                )
+            } else {
+                root.setPadding(
+                    initialLeftPadding,
+                    initialTopPadding + topInset,
+                    initialRightPadding,
+                    initialBottomPadding + bottomInset
+                )
+            }
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            applyInsets(insets)
+            insets
+        }
+        root.post {
+            applyInsets(ViewCompat.getRootWindowInsets(root))
+            ViewCompat.requestApplyInsets(root)
+        }
     }
 
     override fun setTitle(titleId: Int) {

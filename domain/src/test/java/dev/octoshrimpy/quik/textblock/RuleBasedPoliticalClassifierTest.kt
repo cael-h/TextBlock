@@ -101,6 +101,37 @@ class RuleBasedPoliticalClassifierTest {
     }
 
     @Test
+    fun democraticStrategySurveyWithOptOutFooterQuarantines() {
+        val result = classify(
+            address = "+14422236727",
+            body = """
+                Kyle, you've been selected for a 1-min survey. Your input directly shapes
+                Democratic strategy. Will you take it? http://s.alchemer.com/s3/example
+                Stop to End
+            """.trimIndent()
+        )
+
+        assertQuarantined(result, FilterCategory.POLITICAL)
+        assertReasonIncludes(result, "political opt-out combination")
+    }
+
+    @Test
+    fun forwardBlueObamaLinkQuarantines() {
+        val result = classify(
+            address = "+17712080608",
+            body = """
+                Barack Obama just met with House Democrats and made an AMAZING statement >>
+                READ MORE NOW! https://fwd-blue.com/l/WvSnAZ
+                -ForwardBlue
+                Stop2Quit
+            """.trimIndent()
+        )
+
+        assertQuarantined(result, FilterCategory.POLITICAL)
+        assertReasonIncludes(result, "known campaign domain")
+    }
+
+    @Test
     fun benignPoliticalConversationFromContactIsAllowedWhenScoreIsLow() {
         val result = classify(
             address = "+15551234567",

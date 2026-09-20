@@ -17,14 +17,16 @@ object TextBlockFilterPolicy {
         allowContacts: Boolean,
         isFromContact: Boolean
     ): Boolean {
-        return filteringEnabled && !(allowContacts && isFromContact)
+        // Android Contacts are always trusted so a user cannot lose an expected
+        // notification because of a political or content-filter match.
+        return filteringEnabled && !isFromContact
     }
 
     fun isFromContactForClassifier(
         allowContacts: Boolean,
         isFromContact: Boolean
     ): Boolean {
-        return allowContacts && isFromContact
+        return isFromContact
     }
 
     fun actionFor(

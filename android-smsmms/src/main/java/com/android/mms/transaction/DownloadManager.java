@@ -32,6 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * We should manage to call SMSManager.downloadMultimediaMessage().
  */
 public class DownloadManager {
+    public static final String EXTRA_RESULT_CODE = "com.android.mms.transaction.extra.RESULT_CODE";
+
     private static DownloadManager ourInstance = new DownloadManager();
     private static final ConcurrentHashMap<String, MmsDownloadReceiver> mMap = new ConcurrentHashMap<>();
 
@@ -49,11 +51,22 @@ public class DownloadManager {
             return;
         }
 
+        final Context applicationContext = context.getApplicationContext();
         MmsDownloadReceiver receiver = new MmsDownloadReceiver();
         mMap.put(location, receiver);
 
         // Use unique action in order to avoid cancellation of notifying download result.
-        context.getApplicationContext().registerReceiver(receiver, new IntentFilter(receiver.mAction));
+        try {
+            IntentFilter filter = new IntentFilter(receiver.mAction);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                applicationContext.registerReceiver(receiver, filter);
+            }
+        } catch (RuntimeException error) {
+            mMap.remove(location, receiver);
+            throw error;
+        }
 
         Timber.v("receiving with system method");
         final String fileName = "download." + Math.abs(new Random().nextLong()) + ".dat";
@@ -64,6 +77,7 @@ public class DownloadManager {
                 .scheme(ContentResolver.SCHEME_CONTENT)
                 .build();
         Intent download = new Intent(receiver.mAction);
+        download.setPackage(context.getPackageName());
         download.putExtra(MmsReceivedReceiver.EXTRA_FILE_PATH, mDownloadFile.getPath());
         download.putExtra(MmsReceivedReceiver.EXTRA_LOCATION_URL, location);
         download.putExtra(MmsReceivedReceiver.EXTRA_TRIGGER_PUSH, byPush);
@@ -83,14 +97,13 @@ public class DownloadManager {
             // configOverrides = smsManager.getCarrierConfigValues();
         }
 
-        grantUriPermission(context, contentUri);
-        smsManager.downloadMultimediaMessage(context, location, contentUri, configOverrides, pendingIntent);
-    }
-
-    private void grantUriPermission(Context context, Uri contentUri) {
-        context.grantUriPermission(context.getPackageName() + ".MmsFileProvider",
-                contentUri,
-                Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        try {
+            smsManager.downloadMultimediaMessage(context, location, contentUri, configOverrides, pendingIntent);
+        } catch (RuntimeException error) {
+            applicationContext.unregisterReceiver(receiver);
+            mMap.remove(location, receiver);
+            throw error;
+        }
     }
 
     private static class MmsDownloadReceiver extends BroadcastReceiver {
@@ -111,6 +124,7 @@ public class DownloadManager {
 
             Intent newIntent = (Intent) intent.clone();
             newIntent.setAction(MmsReceivedReceiver.MMS_RECEIVED);
+            newIntent.putExtra(EXTRA_RESULT_CODE, getResultCode());
             BroadcastUtils.sendExplicitBroadcast(context, newIntent, MmsReceivedReceiver.MMS_RECEIVED);
         }
     }
@@ -118,6 +132,7 @@ public class DownloadManager {
     public static void finishDownload(String location) {
         if (location != null) {
             mMap.remove(location);
+            PushReceiver.finishDownload(location);
         }
     }
 }

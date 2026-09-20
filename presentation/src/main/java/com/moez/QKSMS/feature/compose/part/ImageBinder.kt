@@ -59,7 +59,11 @@ class ImageBinder @Inject constructor(colors: Colors, private val context: Conte
         }
 
         tryOrNull(true) {
-            GlideApp.with(context).load(part.getUri()).fitCenter().into(binding.thumbnail)
+            if (part.type.equals("image/gif", ignoreCase = true)) {
+                GlideApp.with(context).asGif().load(part.getUri()).fitCenter().into(binding.thumbnail)
+            } else {
+                GlideApp.with(context).load(part.getUri()).fitCenter().into(binding.thumbnail)
+            }
         }
     }
 

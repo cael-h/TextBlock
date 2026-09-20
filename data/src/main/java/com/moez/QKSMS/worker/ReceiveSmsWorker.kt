@@ -34,6 +34,7 @@ import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.textblock.ClassificationResult
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
+import dev.octoshrimpy.quik.textblock.TextBlockReceiveDecision
 import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
 import dev.octoshrimpy.quik.textblock.TextBlockReceivePolicy
 import dev.octoshrimpy.quik.textblock.toTextBlockBlockReason
@@ -69,52 +70,65 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
 
         val message = messageRepo.getMessage(messageId) ?: return Result.failure(inputData)
 
-        val action = blockingClient.shouldBlock(message.address).blockingGet()
+        val senderIsContact = contactsRepo.isContact(message.address)
+        val isTrustedSender = senderIsContact
 
-        when {
-            ((action is BlockingClient.Action.Block) && prefs.drop.get()) -> {
-                // blocked and 'drop blocked' remove from db and don't continue
-                Timber.v("address is blocked and drop blocked is on. dropped")
+        if (isTrustedSender) {
+            // An Android contact must not be reclassified by
+            // legacy block/content filters or TextBlock political filtering.
+            Timber.v("trusted sender bypasses inbound filters")
+            conversationRepo.markUnblocked(message.threadId)
+        } else {
+            val action = blockingClient.shouldBlock(message.address).blockingGet()
+
+            when {
+                ((action is BlockingClient.Action.Block) && prefs.drop.get()) -> {
+                    // blocked and 'drop blocked' remove from db and don't continue
+                    Timber.v("address is blocked and drop blocked is on. dropped")
+                    messageRepo.deleteMessages(listOf(message.id))
+                    return Result.failure(inputData)
+                }
+
+                action is BlockingClient.Action.Block -> {
+                    // blocked
+                    Timber.v("address is blocked")
+                    messageRepo.markRead(listOf(message.threadId))
+                    conversationRepo.markBlocked(
+                        listOf(message.threadId),
+                        prefs.blockingManager.get(),
+                        action.reason
+                    )
+                }
+
+                action is BlockingClient.Action.Unblock -> {
+                    // unblock
+                    Timber.v("unblock conversation if blocked")
+                    conversationRepo.markUnblocked(message.threadId)
+                }
+            }
+
+            val messageFilterAction = filterRepo.isBlocked(message.getText(), message.address, contactsRepo)
+            if (messageFilterAction) {
+                Timber.v("message dropped based on content filters")
                 messageRepo.deleteMessages(listOf(message.id))
                 return Result.failure(inputData)
             }
-
-            action is BlockingClient.Action.Block -> {
-                // blocked
-                Timber.v("address is blocked")
-                messageRepo.markRead(listOf(message.threadId))
-                conversationRepo.markBlocked(
-                    listOf(message.threadId),
-                    prefs.blockingManager.get(),
-                    action.reason
-                )
-            }
-
-            action is BlockingClient.Action.Unblock -> {
-                // unblock
-                Timber.v("unblock conversation if blocked")
-                conversationRepo.markUnblocked(message.threadId)
-            }
-        }
-
-        val messageFilterAction = filterRepo.isBlocked(message.getText(), message.address, contactsRepo)
-        if (messageFilterAction) {
-            Timber.v("message dropped based on content filters")
-            messageRepo.deleteMessages(listOf(message.id))
-            return Result.failure(inputData)
         }
 
         // update and fetch conversation
         conversationRepo.updateConversations(listOf(message.threadId))
 
-        val senderIsContact = contactsRepo.isContact(message.address)
-        val textBlockDecision = TextBlockReceivePolicy.evaluate(
-            filteringEnabled = prefs.textBlockFiltering.get(),
-            allowContacts = prefs.textBlockAllowContacts.get(),
-            isFromContact = senderIsContact,
-            dropMode = isTextBlockDropMode()
-        ) { isFromContactForClassifier ->
-            classifyTextBlock(message, isFromContactForClassifier)
+        val textBlockDecision = if (isTrustedSender) {
+            TextBlockReceiveDecision.Allow
+        } else {
+            TextBlockReceivePolicy.evaluate(
+                filteringEnabled = prefs.textBlockFiltering.get(),
+                allowContacts = prefs.textBlockAllowContacts.get(),
+                isFromContact = senderIsContact,
+                dropMode = isTextBlockDropMode()
+            ) { isFromContactForClassifier ->
+                classifyTextBlock(message, isFromContactForClassifier)
+            }
         }
         when (textBlockDecision.effect) {
             TextBlockReceiveEffect.ALLOW -> Unit
@@ -122,6 +136,7 @@ class ReceiveSmsWorker(appContext: Context, workerParams: WorkerParameters)
             TextBlockReceiveEffect.QUARANTINE -> {
                 val textBlockResult = textBlockDecision.requireClassificationResult()
                 Timber.v("TextBlock quarantined SMS as ${textBlockResult.action}")
+                messageRepo.markTextBlockQuarantined(message.id)
                 messageRepo.markRead(listOf(message.threadId))
                 conversationRepo.markBlocked(
                     listOf(message.threadId),

@@ -25,7 +25,7 @@ interface NotificationManager {
 
     fun getForegroundNotificationForWorkersOnOlderAndroids(): Notification
 
-    fun update(threadId: Long)
+    fun update(threadId: Long, alert: Boolean = true)
 
     fun notifyFailed(threadId: Long)
 

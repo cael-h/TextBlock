@@ -16,6 +16,7 @@ import dev.octoshrimpy.quik.textblock.FilterCategory
 import dev.octoshrimpy.quik.textblock.InboundMessageForClassification
 import dev.octoshrimpy.quik.textblock.TextBlockReceiveEffect
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TextBlockCleanupPlannerTest {
@@ -62,6 +63,25 @@ class TextBlockCleanupPlannerTest {
         assertEquals(0, plan.skippedContacts)
         assertEquals(listOf(4L), plan.matches.map { match -> match.candidate.messageId })
         assertEquals(TextBlockReceiveEffect.DROP, plan.matches.single().effect)
+    }
+
+    @Test
+    fun cleanupAlwaysSkipsContactsEvenWhenPreferenceIsDisabled() {
+        val plan = TextBlockCleanupPlanner.plan(
+            candidates = listOf(candidate(messageId = 5, address = "+contact", body = "donate today")),
+            params = TextBlockCleanup.Params(
+                sinceMillis = 0L,
+                action = TextBlockCleanupAction.DELETE,
+                allowContacts = false,
+                blockingClient = 0
+            ),
+            isContact = { address -> address == "+contact" },
+            classify = ::classifyDonateMessages
+        )
+
+        assertEquals(1, plan.scanned)
+        assertEquals(1, plan.skippedContacts)
+        assertTrue(plan.matches.isEmpty())
     }
 
     private fun classifyDonateMessages(message: InboundMessageForClassification): ClassificationResult {

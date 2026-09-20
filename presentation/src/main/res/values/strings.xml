@@ -161,6 +161,8 @@
     <string name="compose_menu_clear">Clear</string>
     <string name="compose_details_title">Message details</string>
     <string name="compose_reactions_title">Reactions</string>
+    <string name="compose_reactions_more">Choose a reaction</string>
+    <string name="compose_reactions_picker_unavailable">Emoji picker unavailable</string>
     <string name="compose_details_type">Type: %s</string>
     <string name="compose_details_from">From: %s</string>
     <string name="compose_details_to">To: %s</string>
@@ -512,8 +514,10 @@
     <string name="theme_apply">Apply</string>
 
     <string name="about_developer">A team of wonderful people from around the world!</string>
-    <string name="about_source" translatable="false">https://github.com/quik-sms/quik</string>
-    <string name="about_changelog" translatable="false">https://github.com/quik-sms/quik/releases</string>
+    <string name="about_source" translatable="false">https://github.com/cael-h/TextBlock</string>
+    <string name="about_changelog" translatable="false">https://github.com/cael-h/TextBlock/releases</string>
+    <string name="about_privacy_title">Privacy policy</string>
+    <string name="about_privacy" translatable="false">https://cael-h.github.io/TextBlock/privacy/</string>
     <string name="about_contact" translatable="false">quik@octo.sh</string>
     <string name="about_license" translatable="false">GNU General Public License v3.0</string>
     <string name="about_copyright" translatable="false">© 2014–2026</string>

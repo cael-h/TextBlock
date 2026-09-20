@@ -93,9 +93,11 @@ import dev.octoshrimpy.quik.repository.SyncRepository
 import dev.octoshrimpy.quik.repository.SyncRepositoryImpl
 import dev.octoshrimpy.quik.textblock.InboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.RuleBasedPoliticalClassifier
+import dev.octoshrimpy.quik.textblock.RuleThenNeuralPoliticalClassifier
 import dev.octoshrimpy.quik.textblock.correction.CorrectionAwareInboundMessageClassifier
 import dev.octoshrimpy.quik.textblock.correction.CorrectionStore
 import dev.octoshrimpy.quik.textblock.correction.RealmCorrectionStore
+import dev.octoshrimpy.quik.textblock.nn.AssetPoliticalNeuralClassifier
 import dev.octoshrimpy.quik.worker.InjectionWorkerFactory
 import javax.inject.Singleton
 
@@ -235,10 +237,16 @@ class AppModule(private var application: Application) {
     fun provideCorrectionStore(store: RealmCorrectionStore): CorrectionStore = store
 
     @Provides
-    fun provideInboundMessageClassifier(correctionStore: CorrectionStore): InboundMessageClassifier {
+    fun provideInboundMessageClassifier(
+        context: Context,
+        correctionStore: CorrectionStore
+    ): InboundMessageClassifier {
         return CorrectionAwareInboundMessageClassifier(
             correctionStore = correctionStore,
-            delegate = RuleBasedPoliticalClassifier()
+            delegate = RuleThenNeuralPoliticalClassifier(
+                ruleClassifier = RuleBasedPoliticalClassifier(),
+                neuralClassifier = AssetPoliticalNeuralClassifier(context)
+            )
         )
     }
 

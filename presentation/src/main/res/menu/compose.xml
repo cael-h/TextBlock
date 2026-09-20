@@ -62,10 +62,9 @@
         app:showAsAction="always" />
     <item
         android:id="@+id/info"
-        android:icon="@drawable/ic_more_vert_black_24dp"
         android:title="@string/menu_info"
         android:visible="false"
-        app:showAsAction="always" />
+        app:showAsAction="never" />
 
     <item
         android:id="@+id/copy"

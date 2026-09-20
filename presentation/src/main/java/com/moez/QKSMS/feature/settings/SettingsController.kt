@@ -202,7 +202,6 @@ class SettingsController : QkController<SettingsControllerBinding, SettingsView,
         binding.textBlockFiltering.checkbox?.isChecked = state.textBlockFilteringEnabled
         binding.textBlockFilterMode.summary = state.textBlockFilterModeSummary
         textBlockFilterModeDialog.adapter.selectedItem = state.textBlockFilterModeId
-        binding.textBlockAllowContacts.checkbox?.isChecked = state.textBlockAllowContactsEnabled
 
         when (state.syncProgress) {
             is SyncRepository.SyncProgress.Idle -> binding.syncingProgress.isVisible = false

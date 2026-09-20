@@ -34,6 +34,7 @@
  */
 package dev.octoshrimpy.quik.receiver
 
+import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -49,6 +50,8 @@ import com.klinker.android.send_message.MmsReceivedReceiver.EXTRA_LOCATION_URL
 import com.klinker.android.send_message.MmsReceivedReceiver.EXTRA_URI
 import com.klinker.android.send_message.MmsReceivedReceiver.SUBSCRIPTION_ID
 import com.klinker.android.send_message.Utils
+import com.android.mms.transaction.DownloadManager
+import java.io.File
 import dev.octoshrimpy.quik.worker.ReceiveMmsWorker
 import dev.octoshrimpy.quik.worker.ReceiveMmsWorker.Companion.INPUT_DATA_EXTRA_FILE_PATH
 import dev.octoshrimpy.quik.worker.ReceiveMmsWorker.Companion.INPUT_DATA_EXTRA_LOCATION_URL
@@ -59,6 +62,18 @@ import timber.log.Timber
 
 class MmsReceivedReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val resultCode = intent.getIntExtra(
+            DownloadManager.EXTRA_RESULT_CODE,
+            Activity.RESULT_OK
+        )
+        if (resultCode != Activity.RESULT_OK) {
+            val locationUrl = intent.getStringExtra(EXTRA_LOCATION_URL)
+            Timber.e("MMS carrier download failed with result code $resultCode")
+            DownloadManager.finishDownload(locationUrl)
+            intent.getStringExtra(EXTRA_FILE_PATH)?.let(::File)?.delete()
+            return
+        }
+
         Timber.v("mms downloaded. create worker to process")
 
         // start worker with message id as param

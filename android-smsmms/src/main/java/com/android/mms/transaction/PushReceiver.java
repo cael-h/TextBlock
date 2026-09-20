@@ -56,8 +56,8 @@ import com.klinker.android.send_message.Settings;
 import com.klinker.android.send_message.SmsManagerFactory;
 import com.klinker.android.send_message.Utils;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -83,7 +83,13 @@ public class PushReceiver extends BroadcastReceiver {
 
     static final int COLUMN_CONTENT_LOCATION      = 0;
 
-    private static Set<String> downloadedUrls = new HashSet<String>();
+    private static final Set<String> downloadedUrls = ConcurrentHashMap.newKeySet();
+
+    static void finishDownload(String location) {
+        if (location != null) {
+            downloadedUrls.remove(location);
+        }
+    }
     private static final ExecutorService PUSH_RECEIVER_EXECUTOR = Executors.newSingleThreadExecutor();
 
     private class ReceivePushTask extends AsyncTask<Intent,Void,Void> {

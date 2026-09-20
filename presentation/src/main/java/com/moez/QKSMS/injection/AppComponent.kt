@@ -47,6 +47,7 @@ import dev.octoshrimpy.quik.feature.widget.WidgetAdapter
 import dev.octoshrimpy.quik.injection.android.ActivityBuilderModule
 import dev.octoshrimpy.quik.injection.android.BroadcastReceiverBuilderModule
 import dev.octoshrimpy.quik.injection.android.ServiceBuilderModule
+import dev.octoshrimpy.quik.interactor.SyncMessage
 import javax.inject.Singleton
 
 @Singleton
@@ -57,6 +58,8 @@ import javax.inject.Singleton
     BroadcastReceiverBuilderModule::class,
     ServiceBuilderModule::class])
 interface AppComponent {
+
+    fun syncMessage(): SyncMessage
 
     fun conversationInfoBuilder(): ConversationInfoComponent.Builder
     fun themePickerBuilder(): ThemePickerComponent.Builder

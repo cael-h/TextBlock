@@ -27,6 +27,7 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import com.moez.QKSMS.manager.MediaRecorderManager
 import dev.octoshrimpy.quik.repository.ScheduledMessageRepository
+import dev.octoshrimpy.quik.repository.MessageRepository
 import dev.octoshrimpy.quik.util.Constants
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -36,6 +37,7 @@ class HousekeepingWorker(appContext: Context, workerParams: WorkerParameters)
 : Worker(appContext, workerParams) {
     companion object {
         private val WORKER_TAG: String = HousekeepingWorker::class.java.simpleName
+        private const val TEXTBLOCK_RETENTION_DAYS = 90L
 
         fun register(context: Context) {
             // don't check return value because, well, we can't do much about a failure
@@ -67,6 +69,7 @@ class HousekeepingWorker(appContext: Context, workerParams: WorkerParameters)
     }
 
     @Inject lateinit var scheduledMessageRepository: ScheduledMessageRepository
+    @Inject lateinit var messageRepository: MessageRepository
 
     override fun doWork(): Result {
         val twoHoursAgo = (System.currentTimeMillis() - (2 * 60 * 60 * 1000))
@@ -78,6 +81,10 @@ class HousekeepingWorker(appContext: Context, workerParams: WorkerParameters)
         removeSavedMessagesTexts(twoHoursAgo)
 
         removeOrphanedComposeDelayCancelledAttachments(twoHoursAgo)
+
+        messageRepository.deleteExpiredTextBlockQuarantine(
+            System.currentTimeMillis() - TimeUnit.DAYS.toMillis(TEXTBLOCK_RETENTION_DAYS)
+        )
 
         return Result.success()
     }

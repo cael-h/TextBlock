@@ -120,7 +120,7 @@ class NotificationManagerImpl @Inject constructor(
     /**
      * Updates the notification for a particular conversation
      */
-    override fun update(threadId: Long) {
+    override fun update(threadId: Long, alert: Boolean) {
         // If notifications are disabled, don't do anything
         if (!prefs.notifications(threadId).get()) {
             return
@@ -185,7 +185,7 @@ class NotificationManagerImpl @Inject constructor(
                 .setSmallIcon(R.drawable.ic_notification)
                 .setNumber(messages.size)
                 .setAutoCancel(true)
-                .setOnlyAlertOnce(true)
+                .setOnlyAlertOnce(!alert)
                 .setContentIntent(contentPI)
                 .setDeleteIntent(seenPI)
                 .setLights(Color.WHITE, 500, 2000)

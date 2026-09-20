@@ -1,5 +1,58 @@
 [
   {
+    "versionCode": 2246,
+    "versionName": "4.3.14",
+    "fixed": [
+      "Restore incoming picture, GIF, and sticker downloads on Android 13 and newer",
+      "Allow an MMS download to be retried after a temporary carrier failure",
+      "Catch more political campaign texts while always allowing Android contacts",
+      "Keep every screen clear of Android's status and navigation bars",
+      "Combine duplicate three-dot menus in conversations"
+    ],
+    "added": [
+      "Use a tiny on-device neural classifier for unfamiliar political text wording",
+      "Keep TextBlock-quarantined messages for 90 days before automatically deleting them"
+    ]
+  },
+  {
+    "versionCode": 2245,
+    "versionName": "4.3.13",
+    "fixed": [
+      "Keep the inbox toolbar and navigation drawer below the Android status bar"
+    ]
+  },
+  {
+    "versionCode": 2244,
+    "versionName": "4.3.12",
+    "fixed": [
+      "Alert again when additional messages arrive in a conversation that already has a notification"
+    ]
+  },
+  {
+    "versionCode": 2243,
+    "versionName": "4.3.11",
+    "fixed": [
+      "Display emoji choices in the full reaction picker",
+      "Prevent emoji rendering from opening conversations before emoji data is ready",
+      "Keep the inbox toolbar and navigation menu below the Android status bar"
+    ]
+  },
+  {
+    "versionCode": 2241,
+    "versionName": "4.3.9",
+    "added": [
+      "React to picture and attachment messages",
+      "Choose any emoji from the reaction bar"
+    ],
+    "improved": [
+      "Animate received GIFs in conversations"
+    ],
+    "fixed": [
+      "Keep the message composer visible above the keyboard",
+      "Open TextBlock release notes from the What's New dialog"
+    ]
+  },
+  {
     "versionCode": 2238,
     "versionName": "4.3.6",
     "fixed": [
