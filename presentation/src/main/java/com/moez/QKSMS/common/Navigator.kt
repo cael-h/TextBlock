@@ -231,7 +231,7 @@ class Navigator @Inject constructor(
     }
 
     fun showRating() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/quik-sms/quik"))
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/cael-h/TextBlock"))
                 .addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY
                         or Intent.FLAG_ACTIVITY_NEW_DOCUMENT
                         or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)

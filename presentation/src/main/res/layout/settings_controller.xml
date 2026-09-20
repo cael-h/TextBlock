@@ -300,6 +300,14 @@
             app:title="@string/settings_about_title"
             tools:summary="@string/settings_version" />
 
+        <dev.octoshrimpy.quik.common.widget.PreferenceView
+            android:id="@+id/supportTextBlock"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:icon="@drawable/ic_star_black_24dp"
+            app:summary="@string/settings_support_summary"
+            app:title="@string/settings_support_title" />
+
     </LinearLayout>
 
 </ScrollView>

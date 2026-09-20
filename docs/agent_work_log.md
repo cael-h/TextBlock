@@ -201,3 +201,17 @@
 - Main model/reasoning: gpt-6-astra | extra high.
 - Commit: this entry is included in the `Prepare TextBlock 4.3.14 Play release`
   commit.
+
+## 2026-09-20 - GitHub support links
+
+- Outcome: corrected the existing drawer star request so it opens the TextBlock
+  repository instead of the upstream QUIK repository. Added a persistent,
+  low-key Settings row reading "Support the TextBlock developer" with a
+  "Star TextBlock on GitHub" action. The drawer request remains dismissible.
+- Verification: `:presentation:bundleRelease` and
+  `:presentation:assembleRelease` passed. AAB SHA-256:
+  `84D143AD5B205B3851609282B2443E04FD130BFFC3147E0A83642AF067E21C68`.
+- Agent role: main integration.
+- Main model/reasoning: gpt-6-astra | extra high.
+- Commit: this entry is included in the `Fix TextBlock GitHub support links`
+  commit.
